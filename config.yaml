@@ -1,0 +1,38 @@
+# Machine/line names and corresponding GPIO pin numbers
+machines:
+  - name: "Line 1"
+    gpio: 4
+  - name: "Line 2"
+    gpio: 17
+  - name: "Line 3"
+    gpio: 27
+  - name: "Line 4"
+    gpio: 22
+  - name: "Line 5"
+    gpio: 5
+  - name: "Line 6"
+    gpio: 6
+  - name: "Line 7"
+    gpio: 13
+  - name: "Line 8"
+    gpio: 19
+  - name: "Line 9"
+    gpio: 26
+  - name: "Line 10"
+    gpio: 21
+
+display:
+  update_interval: 1  # seconds
+  highlight_color: "#FF3B30"    # Red for stopped
+  running_color: "#28CD41"      # Green for running
+  font_size: 48
+  show_historical_chart: true
+  show_MTBF_MTTR: true
+  max_history_days: 30
+
+network:
+  wifi_ssid: "YOUR_WIFI_SSID"
+  wifi_password: "YOUR_WIFI_PASSWORD"
+  static_ip: "192.168.1.100"
+  gateway: "192.168.1.1"
+  dns: "8.8.8.8"
