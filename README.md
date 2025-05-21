@@ -17,3 +17,5 @@ Reboot: sudo reboot
 The monitor, HDMI dashboard, and web dashboard will all auto-start.
 
 Access the dashboard at http://<your-static-ip>:5000 from your phone/computer on the same network.
+
+https://github.com/copilot/share/8a2d5328-49c0-8024-a851-104064d740d8
