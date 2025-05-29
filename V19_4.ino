@@ -479,7 +479,7 @@ String htmlAnalytics() {
   html += "</nav>";
   html += "<div class='main'>";
   html += "<div class='metrics' id='kpiMetrics'></div>";
-  html += "<div style='margin-bottom:0.5em; color:#888; font-size:1em;'>(All times in <b>min:sec</b>)</div>";
+  html += "<div style='margin-bottom:0.5em; color:#888; font-size:1em;'>(Durations in <b>h:mm:ss</b> or <b>mm:ss</b>)</div>";
   html += "<div class='controls'>";
   html += "<label>From: <input type='datetime-local' id='fromTime'></label>";
   html += "<label>To: <input type='datetime-local' id='toTime'></label>";
@@ -492,68 +492,63 @@ String htmlAnalytics() {
   html += "<div class='chartcard'><canvas id='eventChart' style='width:100%;max-width:1050px;height:340px;'></canvas></div>";
   html += "<div class='tablecard'>";
   html += "<h3>Recent Events</h3><table style='width:100%;'><thead><tr>"
-          "<th>Date</th><th>Time</th><th>Asset</th><th>Event</th><th>State</th><th>Avail(%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Run Duration</th><th>Stop Duration</th><th>Note</th></tr></thead>"
+          "<th>Date</th><th>Time</th><th>Asset</th><th>Event</th><th>Avail(%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Run Duration</th><th>Stop Duration</th><th>Note</th></tr></thead>"
           "<tbody id='recentEvents'></tbody></table></div>";
   html += "<script>";
   html += R"rawliteral(
-console.log('Analytics script started (v4 - color fix for 0/1 states).');
+console.log('Analytics script started (v14 - Enhanced MTBF/MTTR tooltips).');
 
 // --- Utility Functions ---
-function floatMinToMMSS(val) {
+function floatMinToMMSS(val) { 
   if (typeof val === "string") val = parseFloat(val);
-  if (isNaN(val) || val < 0) return "00:00";
+  if (isNaN(val) || val < 0) { // Handle NaN or negative by returning 00:00 or similar default
+      let totalSeconds = 0; 
+      let m = Math.floor(totalSeconds / 60); 
+      let s = totalSeconds % 60;
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
   let totalSeconds = Math.round(val * 60);
-  let m = Math.floor(totalSeconds / 60);
-  let s = totalSeconds % 60;
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  if (totalSeconds >= 3600) { 
+    let h = Math.floor(totalSeconds / 3600); 
+    let remainingSecondsAfterHours = totalSeconds % 3600;
+    let m = Math.floor(remainingSecondsAfterHours / 60); 
+    let s = remainingSecondsAfterHours % 60;
+    return `${h.toString()}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  } else { 
+    let m = Math.floor(totalSeconds / 60); 
+    let s = totalSeconds % 60; 
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`; 
+  }
 }
-
-function mmssToSeconds(mmss) {
-  if (!mmss || typeof mmss !== "string") return 0;
+function mmssToSeconds(mmss) { 
+  if (!mmss || typeof mmss !== "string") return 0; 
   let parts = mmss.split(":");
-  if (parts.length !== 2) return 0;
-  let m = parseInt(parts[0], 10);
-  let s = parseInt(parts[1], 10);
-  return (isNaN(m) ? 0 : m) * 60 + (isNaN(s) ? 0 : s);
+  if (parts.length !== 2 && parts.length !==3) return 0; // Allow h:mm:ss too
+  let h = 0, m = 0, s = 0;
+  if (parts.length === 3) {
+    h = parseInt(parts[0], 10); m = parseInt(parts[1], 10); s = parseInt(parts[2], 10);
+  } else { // mm:ss
+    m = parseInt(parts[0], 10); s = parseInt(parts[1], 10);
+  }
+  return (isNaN(h) ? 0 : h * 3600) + (isNaN(m) ? 0 : m * 60) + (isNaN(s) ? 0 : s);
 }
-
 function parseEventDate(eventRow) {
-  if (!eventRow || eventRow.length < 2) {
-    // console.error('Invalid eventRow for date parsing:', eventRow); // Reduced verbosity
-    return new Date(0); 
-  }
+  if (!eventRow || eventRow.length < 2) return new Date(0); 
   try {
-    let [d, m, y] = eventRow[0].split('/').map(Number);
-    let [hh, mm, ss] = eventRow[1].split(':').map(Number);
-    if (isNaN(d) || isNaN(m) || isNaN(y) || isNaN(hh) || isNaN(mm) || isNaN(ss)) {
-        // console.error('NaN detected in date/time parts:', eventRow[0], eventRow[1]); // Reduced verbosity
-        return new Date(0);
-    }
+    let [d, m, y] = eventRow[0].split('/').map(Number); let [hh, mm, ss] = eventRow[1].split(':').map(Number);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || isNaN(hh) || isNaN(mm) || isNaN(ss)) return new Date(0);
     return new Date(Date.UTC(y, m - 1, d, hh, mm, ss));
-  } catch (e) {
-    console.error('Error parsing date for eventRow:', eventRow, e);
-    return new Date(0);
-  }
+  } catch (e) { console.error('Error parsing date for eventRow:', eventRow, e); return new Date(0); }
 }
-
 function toDatetimeLocal(dt) {
-  if (!(dt instanceof Date) || isNaN(dt)) {
-    // console.warn('toDatetimeLocal received invalid date:', dt, 'Using current time.'); // Reduced verbosity
-    dt = new Date(); 
-  }
+  if (!(dt instanceof Date) || isNaN(dt)) dt = new Date(); 
   try {
-    const timezoneOffset = dt.getTimezoneOffset() * 60000;
-    const localDate = new Date(dt.getTime() - timezoneOffset);
+    const timezoneOffset = dt.getTimezoneOffset() * 60000; const localDate = new Date(dt.getTime() - timezoneOffset);
     const pad = n => n < 10 ? '0' + n : n;
-    return localDate.getFullYear() + '-' +
-      pad(localDate.getMonth() + 1) + '-' +
-      pad(localDate.getDate()) + 'T' +
-      pad(localDate.getHours()) + ':' +
-      pad(localDate.getMinutes());
+    return localDate.getFullYear() + '-' + pad(localDate.getMonth() + 1) + '-' + pad(localDate.getDate()) + 'T' + pad(localDate.getHours()) + ':' + pad(localDate.getMinutes());
   } catch (e) {
     console.error('Error in toDatetimeLocal:', e, 'Input date:', dt);
-    const now = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000));
-    return now.toISOString().slice(0, 16);
+    const now = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)); return now.toISOString().slice(0, 16);
   }
 }
 
@@ -561,69 +556,33 @@ function toDatetimeLocal(dt) {
 let asset = '';
 try {
   asset = decodeURIComponent(new URLSearchParams(window.location.search).get("asset") || "");
-  console.log('Asset from URL:', asset);
   const assetNameElement = document.getElementById('assetNameInHeader');
-  if (assetNameElement) {
-    assetNameElement.textContent = asset;
-  } else {
-    // console.warn('Element with ID assetNameInHeader not found.'); // Reduced verbosity
-  }
-} catch (e) {
-  console.error('Error getting asset from URL:', e);
-}
+  if (assetNameElement) assetNameElement.textContent = asset;
+} catch (e) { console.error('Error getting asset from URL:', e); }
 
-let allEvents = [];
-let eventChart = null;
-let filteredEventsGlobal = []; 
+let allEvents = []; let eventChart = null; let filteredEventsGlobal = []; 
 
 // --- Core Logic ---
 function fetchAnalyticsData() {
-  // console.log('fetchAnalyticsData called.'); // Reduced verbosity
   if (!asset) {
     console.warn('No asset specified, aborting fetch.');
     const kpiDiv = document.getElementById('kpiMetrics');
     if (kpiDiv) kpiDiv.innerHTML = "<div class='metric'>No asset specified. Add ?asset=YourAssetName to URL.</div>";
     return;
   }
-
   fetch('/api/events')
-    .then(response => {
-      // console.log('Fetch response status:', response.status); // Reduced verbosity
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
+    .then(response => { if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); return response.json(); })
     .then(rawEvents => {
-      // console.log('Raw events from /api/events (first 5):', rawEvents.slice(0,5)); // Reduced verbosity
-      if (!Array.isArray(rawEvents)) {
-        console.error('Fetched data is not an array:', rawEvents);
-        allEvents = [];
-      } else {
-        allEvents = rawEvents.map(line => {
-          if (typeof line !== 'string') {
-            // console.warn('Event line is not a string:', line); // Reduced verbosity
-            return []; 
-          }
-          return line.split(',');
-        }).filter(eventRow => {
-          if (eventRow.length > 13) { 
-            return eventRow[2] && eventRow[2].trim() === asset.trim();
-          }
-          return false;
-        });
+      if (!Array.isArray(rawEvents)) { console.error('Fetched data is not an array:', rawEvents); allEvents = []; }
+      else {
+        allEvents = rawEvents.map(line => (typeof line === 'string') ? line.split(',') : [])
+                             .filter(eventRow => eventRow.length > 13 && eventRow[2] && eventRow[2].trim() === asset.trim());
       }
-      console.log(`Processed ${allEvents.length} events for asset "${asset}".`);
-      
       if (allEvents.length === 0) {
-        // console.warn(`No events match asset "${asset}".`); // Reduced verbosity
         const kpiDiv = document.getElementById('kpiMetrics');
         if (kpiDiv) kpiDiv.innerHTML = `<div class='metric'>No data found for asset: ${asset}</div>`;
       }
-      
-      setupRangePickers();
-      renderEventChart();
-      renderRecentEvents();
+      setupRangePickers(); renderEventChart(); renderRecentEvents();
     })
     .catch(error => {
       console.error('Error fetching or processing analytics data:', error);
@@ -631,66 +590,33 @@ function fetchAnalyticsData() {
       if (kpiDiv) kpiDiv.innerHTML = `<div class='metric'>Error loading data: ${error.message}</div>`;
     });
 }
-
 function setupRangePickers() {
-  // console.log('setupRangePickers called.'); // Reduced verbosity
   let defaultFromDate, defaultToDate;
-
   if (allEvents.length > 0) {
     try {
       let eventDates = allEvents.map(e => parseEventDate(e)).filter(d => d.getTime() !== 0); 
       if (eventDates.length > 0) {
-        defaultToDate = new Date(Math.max.apply(null, eventDates));
-        defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
-      } else {
-        // console.warn('No valid dates found in events for range pickers.'); // Reduced verbosity
-        defaultToDate = new Date();
-        defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000);
-      }
-    } catch (e) {
-        console.error('Error calculating date range from events:', e);
-        defaultToDate = new Date();
-        defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000);
-    }
-  } else {
-    defaultToDate = new Date();
-    defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000);
-    // console.log('No events, setting default date range.'); // Reduced verbosity
-  }
-  
+        defaultToDate = new Date(Math.max.apply(null, eventDates)); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
+      } else { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
+    } catch (e) { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
+  } else { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
   document.getElementById('fromTime').value = toDatetimeLocal(defaultFromDate);
   document.getElementById('toTime').value = toDatetimeLocal(defaultToDate);
-
-  const elementsToListen = ['fromTime', 'toTime', 'showStart', 'showStop', 'showMTBF', 'showMTTR'];
-  elementsToListen.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.onchange = renderEventChart;
-    // else console.warn(`Element ${id} not found for event listener.`); // Reduced verbosity
+  ['fromTime', 'toTime', 'showStart', 'showStop', 'showMTBF', 'showMTTR'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.onchange = renderEventChart;
   });
-  
   const exportButton = document.getElementById('exportPng');
   if (exportButton) {
     exportButton.onclick = function () {
       if (!eventChart) { console.warn('Export PNG: Chart not ready.'); return; }
-      try {
-        let url = eventChart.toBase64Image();
-        let a = document.createElement('a');
-        a.href = url;
-        a.download = `analytics_${asset}.png`;
-        a.click();
-      } catch (e) { console.error('Error exporting chart to PNG:', e); }
+      try { let url = eventChart.toBase64Image(); let a = document.createElement('a'); a.href = url; a.download = `analytics_${asset}.png`; a.click(); }
+      catch (e) { console.error('Error exporting chart to PNG:', e); }
     };
-  } // else console.warn('Export PNG button not found.'); // Reduced verbosity
-}
-
-function renderKPIs(currentFilteredEventsArray) {
-  const kpiDiv = document.getElementById('kpiMetrics');
-  if (!kpiDiv) { /* console.error('KPI div not found'); */ return; } // Reduced verbosity
-
-  if (!currentFilteredEventsArray || currentFilteredEventsArray.length === 0) {
-    kpiDiv.innerHTML = "<div class='metric'>No data for selected range</div>";
-    return;
   }
+}
+function renderKPIs(currentFilteredEventsArray) {
+  const kpiDiv = document.getElementById('kpiMetrics'); if (!kpiDiv) return;
+  if (!currentFilteredEventsArray || currentFilteredEventsArray.length === 0) { kpiDiv.innerHTML = "<div class='metric'>No data for selected range</div>"; return; }
   try {
     const latestEvent = currentFilteredEventsArray[currentFilteredEventsArray.length - 1];
     kpiDiv.innerHTML =
@@ -700,134 +626,158 @@ function renderKPIs(currentFilteredEventsArray) {
        <div class='metric'>Availability: <b>${parseFloat(latestEvent[5]).toFixed(2)}%</b></div>
        <div class='metric'>MTBF: <b>${floatMinToMMSS(latestEvent[8])}</b></div>
        <div class='metric'>MTTR: <b>${floatMinToMMSS(latestEvent[9])}</b></div>`;
-  } catch (e) {
-    console.error('Error rendering KPIs:', e, 'Data:', currentFilteredEventsArray[currentFilteredEventsArray.length - 1]);
-    kpiDiv.innerHTML = "<div class='metric'>Error rendering KPIs</div>";
-  }
+  } catch (e) { console.error('Error rendering KPIs:', e); kpiDiv.innerHTML = "<div class='metric'>Error rendering KPIs</div>"; }
 }
-
 function renderEventChart() {
-  // console.log('renderEventChart called.'); // Reduced verbosity
-  if (!allEvents || allEvents.length === 0) {
-    // console.log('No events to render in chart (allEvents is empty).'); // Reduced verbosity
-    if (eventChart) { eventChart.destroy(); eventChart = null; }
-    return;
-  }
-
+  if (!allEvents || allEvents.length === 0) { if (eventChart) { eventChart.destroy(); eventChart = null; } return; }
   let fromDate, toDate;
-  try {
-    fromDate = new Date(document.getElementById('fromTime').value);
-    toDate = new Date(document.getElementById('toTime').value);
-  } catch (e) { console.error('Error parsing date/time input values:', e); return; }
-
-  const showStart = document.getElementById('showStart').checked;
-  const showStop = document.getElementById('showStop').checked;
-  const showMTBF = document.getElementById('showMTBF').checked;
-  const showMTTR = document.getElementById('showMTTR').checked;
-
+  try { fromDate = new Date(document.getElementById('fromTime').value); toDate = new Date(document.getElementById('toTime').value); }
+  catch (e) { console.error('Error parsing date/time input values:', e); return; }
+  const showStart = document.getElementById('showStart').checked; const showStop = document.getElementById('showStop').checked;
+  const showMTBF = document.getElementById('showMTBF').checked; const showMTTR = document.getElementById('showMTTR').checked;
+  
   filteredEventsGlobal = allEvents.filter(eventRow => {
     try {
-      const eventDate = parseEventDate(eventRow);
-      if (eventDate.getTime() === 0) return false; 
-      if (eventDate < fromDate || eventDate > toDate) return false;
-      if (!eventRow[3]) return false; 
+      const eventDate = parseEventDate(eventRow); if (eventDate.getTime() === 0) return false; 
+      if (eventDate < fromDate || eventDate > toDate) return false; if (!eventRow[3]) return false; 
       if (eventRow[3].trim().toUpperCase() === "START" && !showStart) return false;
-      if (eventRow[3].trim().toUpperCase() === "STOP" && !showStop) return false;
-      return true;
-    } catch (e) { /* console.error('Error filtering eventRow:', eventRow, e); */ return false; } // Reduced verbosity
+      if (eventRow[3].trim().toUpperCase() === "STOP" && !showStop) return false; return true;
+    } catch (e) { return false; }
   });
-  // console.log(`Filtered down to ${filteredEventsGlobal.length} events for chart.`); // Reduced verbosity
-
   renderKPIs(filteredEventsGlobal); 
-
-  if (filteredEventsGlobal.length === 0) {
-    // console.log('No events in the selected range/filters to display in chart.'); // Reduced verbosity
-    if (eventChart) { eventChart.destroy(); eventChart = null; }
-    return;
-  }
+  if (filteredEventsGlobal.length === 0) { if (eventChart) { eventChart.destroy(); eventChart = null; } return; }
 
   try {
     let times = filteredEventsGlobal.map(e => e[1]); 
     let avail = filteredEventsGlobal.map(e => parseFloat(e[5]));
-    let mtbfValues = filteredEventsGlobal.map(e => parseFloat(e[8]));
+    let mtbfValues = filteredEventsGlobal.map(e => parseFloat(e[8])); 
     let mttrValues = filteredEventsGlobal.map(e => parseFloat(e[9]));
-    
-    // State array will contain "0", "1", or "UNKNOWN_STATE"
     let stateArr = filteredEventsGlobal.map(e => e[4] ? e[4].trim() : 'UNKNOWN_STATE'); 
-    console.log('State array for chart segments (first 10 values): [' + stateArr.slice(0,10).join(', ') + ']');
-
-
-    let pointColors = filteredEventsGlobal.map(e => {
+    
+    let pointColors = filteredEventsGlobal.map((e, index, arr) => {
       const eventType = e[3] ? e[3].trim().toUpperCase() : "";
-      const stopDuration = e[12] || "0:0";
-      if (eventType === "STOP" && mmssToSeconds(stopDuration) >= 300) return "#c62828"; 
+      let durationForStopDecision = "0:0";
+      if (eventType === "STOP") {
+        if (index + 1 < arr.length) { 
+          const nextEvent = arr[index + 1];
+          const nextEventType = nextEvent[3] ? nextEvent[3].trim().toUpperCase() : "";
+          if (nextEventType === "START") { durationForStopDecision = nextEvent[12] || "0:0"; } 
+          else { durationForStopDecision = e[12] || "0:0"; }
+        } else { durationForStopDecision = e[12] || "0:0"; }
+      }
+      if (eventType === "STOP" && mmssToSeconds(durationForStopDecision) >= 300) return "#c62828"; 
       if (eventType === "STOP") return "#ff9800"; 
       return "#43a047"; 
     });
-    let pointSizes = filteredEventsGlobal.map(e => {
+
+    let pointSizes = filteredEventsGlobal.map((e, index, arr) => {
        const eventType = e[3] ? e[3].trim().toUpperCase() : "";
-       const stopDuration = e[12] || "0:0";
-      return (eventType === "STOP" && mmssToSeconds(stopDuration) >= 300) ? 12 : 7;
+       let durationForStopDecision = "0:0";
+       if (eventType === "STOP") {
+         if (index + 1 < arr.length) {
+           const nextEvent = arr[index + 1];
+           const nextEventType = nextEvent[3] ? nextEvent[3].trim().toUpperCase() : "";
+           if (nextEventType === "START") { durationForStopDecision = nextEvent[12] || "0:0"; } 
+           else { durationForStopDecision = e[12] || "0:0"; }
+         } else { durationForStopDecision = e[12] || "0:0"; }
+       }
+      let defaultSize = 7;
+      if (eventType === "STOP" && mmssToSeconds(durationForStopDecision) >= 300) { defaultSize = 12; }
+      return defaultSize;
     });
 
     let datasets = [{
-      label: 'Availability (%)',
-      data: avail,
-      yAxisID: 'y',
-      stepped: true,
-      tension: 0,
-      pointRadius: pointSizes,
-      pointBackgroundColor: pointColors,
-      pointBorderColor: pointColors,
-      showLine: true,
+      label: 'Availability (%)', data: avail, yAxisID: 'y', stepped: true, tension: 0,
+      pointRadius: pointSizes, pointBackgroundColor: pointColors, pointBorderColor: pointColors, showLine: true,
       segment: {
         borderColor: ctx => {
-          const index = ctx.p0DataIndex;
-          const stateValue = stateArr[index]; // This will be "0", "1", or "UNKNOWN_STATE"
-          let color;
-          if (stateValue === "1") { // "1" means RUNNING (based on your data)
-            color = "#43a047"; // green
-          } else if (stateValue === "0") { // "0" means STOPPED (based on your data)
-            color = "#c62828"; // red
-          } else {
-            color = "#000000"; // black for truly unexpected states
-            if (ctx.p0DataIndex < 5) { // Log only for first few segments
-                 console.warn(`Segment ${index}: Unexpected state for coloring='${stateValue}', using black.`);
-            }
-          }
-          return color;
+          const stateValue = stateArr[ctx.p0DataIndex];
+          if (stateValue === "1") return "#43a047"; if (stateValue === "0") return "#c62828"; 
+          return "#000000"; 
         },
         borderWidth: 3
       }
     }];
-
     if (showMTBF) datasets.push({ label: 'MTBF', data: mtbfValues, yAxisID: 'y1', borderColor: "#1565c0", borderWidth: 2, tension: 0, pointRadius: 4 });
     if (showMTTR) datasets.push({ label: 'MTTR', data: mttrValues, yAxisID: 'y1', borderColor: "#FFD600", borderWidth: 2, tension: 0, pointRadius: 4 });
     
     if (eventChart) eventChart.destroy();
     const ctx = document.getElementById('eventChart').getContext('2d');
     eventChart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: times, datasets: datasets },
+      type: 'line', data: { labels: times, datasets: datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false }, 
+        interaction: { mode: 'nearest', axis: 'x', intersect: true }, 
+        layout: { padding: { top: 15 }},
         plugins: {
           tooltip: {
             callbacks: {
               title: (tooltipItems) => {
-                if (!tooltipItems.length) return '';
+                if (!tooltipItems.length) return ''; 
                 const idx = tooltipItems[0].dataIndex;
                 if (!filteredEventsGlobal[idx]) return 'Error: No data for this point.';
                 return `Event: ${filteredEventsGlobal[idx][3]} at ${filteredEventsGlobal[idx][0]} ${filteredEventsGlobal[idx][1]}`;
               },
               label: (tooltipItem) => {
                 const idx = tooltipItem.dataIndex;
-                if (!filteredEventsGlobal[idx]) return '';
                 const eventRow = filteredEventsGlobal[idx];
-                if (eventRow[3] && eventRow[3].trim().toUpperCase() === "STOP") return `Stopped. Run: ${eventRow[11]}. Stop: ${eventRow[12]}.`;
-                if (eventRow[3] && eventRow[3].trim().toUpperCase() === "START") return `Started. Prior Stop: ${eventRow[12]}.`;
-                return '';
+                const eventType = eventRow[3] ? eventRow[3].trim().toUpperCase() : "";
+                const datasetLabel = tooltipItem.dataset.label || '';
+                let lines = [];
+
+                if (datasetLabel === 'Availability (%)') {
+                  const currentAvail = parseFloat(eventRow[5]).toFixed(2);
+                  lines.push(`Availability: ${currentAvail}%`);
+                  if (eventType === "START") {
+                    const stopDurationSeconds = mmssToSeconds(eventRow[12] || "0:0");
+                    if (stopDurationSeconds > 0) {
+                         lines.push(`(Prior Stop: ${floatMinToMMSS(stopDurationSeconds / 60.0)})`);
+                    }
+                  } else if (eventType === "STOP") {
+                    const runDurationSeconds = mmssToSeconds(eventRow[11] || "0:0");
+                    if (runDurationSeconds > 0) {
+                        lines.push(`(Prior Run: ${floatMinToMMSS(runDurationSeconds / 60.0)})`);
+                    }
+                  }
+                } else if (datasetLabel === 'MTBF' || datasetLabel === 'MTTR') {
+                  const currentValue = tooltipItem.raw; // Raw numerical value (float minutes)
+                  const formattedCurrentValue = floatMinToMMSS(currentValue);
+                  lines.push(`${datasetLabel}: ${formattedCurrentValue}`);
+
+                  if (idx > 0) {
+                    const previousValue = tooltipItem.dataset.data[idx - 1];
+                    if (typeof previousValue === 'number' && typeof currentValue === 'number') {
+                        const change = currentValue - previousValue;
+                        if (Math.abs(change) > 1e-7) { // Tolerance for float comparison
+                            const formattedChange = floatMinToMMSS(Math.abs(change));
+                            let changeIndicator = "";
+                            if (datasetLabel === 'MTBF') {
+                                changeIndicator = change > 0 ? `(Increased by ${formattedChange} - Good)` : `(Decreased by ${formattedChange} - Bad)`;
+                            } else { // MTTR
+                                changeIndicator = change > 0 ? `(Increased by ${formattedChange} - Bad)` : `(Decreased by ${formattedChange} - Good)`;
+                            }
+                            lines.push(changeIndicator);
+                        } else {
+                            lines.push(`(No significant change)`);
+                        }
+                    }
+                  } else {
+                    lines.push(`(Initial value)`);
+                  }
+
+                  if (datasetLabel === 'MTBF' && eventType === "STOP") {
+                    const lastRunDurationSeconds = mmssToSeconds(eventRow[11] || "0:0");
+                    if (lastRunDurationSeconds > 0) {
+                      lines.push(`(Influenced by last run: ${floatMinToMMSS(lastRunDurationSeconds / 60.0)})`);
+                    }
+                  } else if (datasetLabel === 'MTTR' && eventType === "START") {
+                    const lastStopDurationSeconds = mmssToSeconds(eventRow[12] || "0:0");
+                    if (lastStopDurationSeconds > 0) {
+                      lines.push(`(Influenced by last stop: ${floatMinToMMSS(lastStopDurationSeconds / 60.0)})`);
+                    }
+                  }
+                }
+                return lines.length > 0 ? lines : null; // Return null if no lines to show for this dataset item
               }
             }
           },
@@ -835,79 +785,60 @@ function renderEventChart() {
         },
         scales: {
           x: { title: { display: true, text: 'Time (HH:MM:SS)' } },
-          y: { title: { display: true, text: 'Availability (%)' }, beginAtZero: true, max: 100 },
-          y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'MTBF/MTTR (min:sec)' }, beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { callback: val => floatMinToMMSS(val) } }
+          y: { 
+            title: { display: true, text: 'Availability (%)' }, 
+            beginAtZero: true, 
+            suggestedMax: 105, 
+            ticks: {
+                stepSize: 20,    
+                callback: function(value, index, values) {
+                    if (value > 100) return undefined; 
+                    if (value === 100) return 100;
+                    if (value < 100 && value >= 0 && (value % (this.chart.options.scales.y.ticks.stepSize || 20) === 0) ) return value;
+                    return undefined; 
+                }
+            }
+          }, 
+          y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'MTBF/MTTR' }, beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { callback: val => floatMinToMMSS(val) } }
         }
       }
     });
-    // console.log('Chart rendered.'); // Reduced verbosity
-  } catch (e) {
-    console.error('Error rendering chart:', e);
-  }
+  } catch (e) { console.error('Error rendering chart:', e); }
 }
-
 function renderRecentEvents() {
-  const tbody = document.getElementById('recentEvents');
-  if (!tbody) { /* console.error('Recent events table body not found.'); */ return; } // Reduced verbosity
-  tbody.innerHTML = ""; 
-
-  if (!allEvents || allEvents.length === 0) {
-    tbody.innerHTML = "<tr><td colspan='14'>No event data available for this asset.</td></tr>";
-    return;
-  }
-  
+  const tbody = document.getElementById('recentEvents'); if (!tbody) return; tbody.innerHTML = ""; 
+  if (!allEvents || allEvents.length === 0) { tbody.innerHTML = "<tr><td colspan='13'>No event data for this asset.</td></tr>"; return; }
   const eventsToDisplay = allEvents.slice(-10).reverse(); 
-  if (eventsToDisplay.length === 0) {
-    tbody.innerHTML = "<tr><td colspan='14'>No recent events for this asset.</td></tr>";
-    return;
-  }
-  
+  if (eventsToDisplay.length === 0) { tbody.innerHTML = "<tr><td colspan='13'>No recent events for this asset.</td></tr>"; return; }
   eventsToDisplay.forEach(eventRow => {
     try {
-      if (eventRow.length < 14) {
-        // console.warn('Skipping rendering recent event row due to insufficient columns:', eventRow); // Reduced verbosity
-        let tr = tbody.insertRow();
-        let td = tr.insertCell();
-        td.colSpan = 14;
-        td.textContent = "Malformed event data.";
-        td.style.color = "orange";
-        return; 
+      if (eventRow.length < 14) { 
+          let tr = tbody.insertRow(); let td = tr.insertCell(); td.colSpan = 13; 
+          td.textContent = "Malformed data."; td.style.color = "orange"; return; 
       }
       let tr = tbody.insertRow();
-      tr.insertCell().textContent = eventRow[0];  
-      tr.insertCell().textContent = eventRow[1];  
-      tr.insertCell().textContent = eventRow[2];  
-      tr.insertCell().textContent = eventRow[3];  
-      tr.insertCell().textContent = eventRow[4];  
+      tr.insertCell().textContent = eventRow[0];  tr.insertCell().textContent = eventRow[1];  
+      tr.insertCell().textContent = eventRow[2];  tr.insertCell().textContent = eventRow[3];  
       tr.insertCell().textContent = parseFloat(eventRow[5]).toFixed(2); 
       tr.insertCell().textContent = floatMinToMMSS(eventRow[6]); 
       tr.insertCell().textContent = floatMinToMMSS(eventRow[7]); 
       tr.insertCell().textContent = floatMinToMMSS(eventRow[8]); 
-      tr.insertCell().textContent = floatMinToMMSS(eventRow[9]); 
+      tr.insertCell().textContent = floatMinToMMSS(eventRow[9]);
       tr.insertCell().textContent = eventRow[10]; 
-      tr.insertCell().textContent = eventRow[11]; 
-      tr.insertCell().textContent = eventRow[12]; 
+      tr.insertCell().textContent = floatMinToMMSS(mmssToSeconds(eventRow[11] || "0:0") / 60.0); 
+      tr.insertCell().textContent = floatMinToMMSS(mmssToSeconds(eventRow[12] || "0:0") / 60.0); 
       tr.insertCell().textContent = eventRow[13] || ""; 
     } catch (e) {
       console.error('Error rendering row for event:', eventRow, e);
-      let tr = tbody.insertRow();
-      let td = tr.insertCell();
-      td.colSpan = 14;
-      td.textContent = "Error displaying this event row.";
-      td.style.color = "red";
+      let tr = tbody.insertRow(); let td = tr.insertCell(); td.colSpan = 13; 
+      td.textContent = "Error displaying row."; td.style.color = "red";
     }
   });
 }
-
 // --- Initialisation ---
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
-} else {
-  fetchAnalyticsData(); 
-}
-
-// console.log('Analytics script finished initial setup.'); // Reduced verbosity
-  )rawliteral";
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', fetchAnalyticsData); }
+else { fetchAnalyticsData(); }
+)rawliteral";
   html += "</script>";
   html += "</div></body></html>";
   return html;
@@ -1278,7 +1209,6 @@ window.onload = fetchChannelsAndStart;
   return html;
 }
 
-// SETUP PAGE (unchanged except for style consistency)
 
 String htmlConfig() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
