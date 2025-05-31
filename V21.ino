@@ -3,13 +3,15 @@
 #include <SPIFFS.h>
 #include <Preferences.h>
 #include <time.h>
+#include <ctype.h> 
 
-// Forward declarations for all handlers and HTML generators
+// Forward declarations
 String htmlDashboard();
 String htmlAnalytics();
 String htmlAnalyticsCompare();
 String htmlConfig();
-String htmlEvents();
+// String htmlEvents(); // Will be replaced by void sendHtmlEventsPage()
+void sendHtmlEventsPage(); // New declaration for chunked sending
 String wifiConfigHTML();
 String htmlAssetDetail(uint8_t idx);
 void handleConfigPost();
@@ -23,12 +25,9 @@ void handleNotFound();
 void updateEventNote(String date, String time, String assetName, String note, String reason);
 void logEvent(uint8_t assetIdx, bool state, time_t now, const char* note = nullptr, unsigned long runDuration = 0, unsigned long stopDuration = 0);
 void handleWiFiReconfigurePost();
-// ADDED/ENSURED Forward Declarations for functions called before definition:
-void setupWiFiSmart();
-void setupTime();
-void saveConfig();
-String urlDecode(const String& str); // Existing
-String urlEncode(const String& str); // ADDED Forward Declaration for urlEncode
+void setupTime(); 
+String urlEncode(const String& str); 
+String urlDecode(const String& str);
 
 // USER CONFIGURATION
 #define MAX_ASSETS 10
@@ -44,7 +43,7 @@ struct Config {
   AssetConfig assets[MAX_ASSETS];
   char downtimeReasons[5][32];
   int tzOffset;
-  int longStopThresholdSec; // in seconds
+  int longStopThresholdSec; 
 } config;
 
 struct AssetState {
@@ -56,25 +55,24 @@ struct AssetState {
   unsigned long lastEventTime;
   uint32_t runCount;
   uint32_t stopCount;
-  unsigned long lastRunDuration;   // New: For event log
-  unsigned long lastStopDuration;  // New: For event log
+  unsigned long lastRunDuration;   
+  unsigned long lastStopDuration;  
 };
 
-// Define the Event struct
 struct Event {
-  time_t timestamp;          // Event time (seconds since epoch)
-  char assetName[32];        // Asset name
-  char eventType[8];         // "START" or "STOP"
-  int state;                 // 1 = running, 0 = stopped
-  float availability;        // Percentage
-  float runtime;             // Minutes
-  float downtime;            // Minutes
-  float mtbf;                // Minutes
-  float mttr;                // Minutes
-  unsigned int stops;        // Stop count
-  char runDuration[8];       // "MM:SS", may be empty
-  char stopDuration[8];      // "MM:SS", may be empty
-  char note[64];             // Note, may be empty
+  time_t timestamp;          
+  char assetName[32];        
+  char eventType[8];         
+  int state;                 
+  float availability;        
+  float runtime;             
+  float downtime;            
+  float mtbf;                
+  float mttr;                
+  unsigned int stops;        
+  char runDuration[8];       
+  char stopDuration[8];      
+  char note[64];             
 
   Event() {
     timestamp = 0;
@@ -94,10 +92,9 @@ struct Event {
 };
 
 WebServer server(80);
-Preferences prefs; // Note: Using local Preferences objects in functions is often safer
+Preferences prefs;
 AssetState assetStates[MAX_ASSETS];
 
-// --- WiFi Config Section ---
 char wifi_ssid[33] = "";
 char wifi_pass[65] = "";
 
@@ -109,8 +106,8 @@ String wifiConfigHTML() {
                 "form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 0 8px #ccc; max-width: 400px; margin:auto;}"
                 "h1 { color: #0366d6; }"
                 "label { display:block; margin-top:1em; }"
-                "input[type=text], input[type=password] { width:100%; padding:0.5em; }"
-                "input[type=submit] { background: #0366d6; color: #fff; border: none; padding: 0.7em 1.5em; margin-top:1em; border-radius: 4px;}"
+                "input[type=text], input[type=password] { width:100%; padding:0.5em; box-sizing: border-box; }" 
+                "input[type=submit] { background: #0366d6; color: #fff; border: none; padding: 0.7em 1.5em; margin-top:1em; border-radius: 4px; cursor:pointer;}" 
                 "input[type=submit]:hover { background: #0356b6; }"
                 ".note { color: #888; font-size: 0.95em; margin: 1em 0; }"
                 "</style>"
@@ -123,7 +120,7 @@ String wifiConfigHTML() {
   html += "'>"
           "<label>Password:</label>"
           "<input type='password' name='password' maxlength='64' value='";
-  // html += wifi_pass; // Typically don't pre-fill password for security
+  html += wifi_pass; 
   html += "'>"
           "<div class='note'>Enter your WiFi details above. Device will reboot after saving.</div>"
           "<input type='submit' value='Save & Reboot'>"
@@ -134,22 +131,17 @@ String wifiConfigHTML() {
 
 void handleWifiConfigPost() {
   if (server.hasArg("ssid")) {
-    String ssid_arg = server.arg("ssid"); // Use different var name
-    String pass_arg = server.arg("password"); // Use different var name
+    String ssid_arg = server.arg("ssid"); 
+    String pass_arg = server.arg("password"); 
     strncpy(wifi_ssid, ssid_arg.c_str(), 32);
     wifi_ssid[32] = '\0';
     strncpy(wifi_pass, pass_arg.c_str(), 64);
     wifi_pass[64] = '\0';
-
-    Preferences localPrefs; // Use local instance
-    if (localPrefs.begin("assetmon", false)) {
-        localPrefs.putString("ssid", wifi_ssid);
-        localPrefs.putString("pass", wifi_pass);
-        localPrefs.end();
-    } else {
-        Serial.println("handleWifiConfigPost: Failed to open preferences.");
-    }
-    server.send(200, "text/html", "<h2>Saved! Rebooting...</h2><meta http-equiv='refresh' content='3;url=/' />");
+    prefs.begin("assetmon", false);
+    prefs.putString("ssid", wifi_ssid);
+    prefs.putString("pass", wifi_pass);
+    prefs.end();
+    server.send(200, "text/html", "<h2>Saved! Rebooting...</h2><meta http-equiv='refresh' content='3;url=/' />"); 
     delay(1000);
     ESP.restart();
   } else {
@@ -159,94 +151,46 @@ void handleWifiConfigPost() {
 
 void startConfigPortal() {
   WiFi.mode(WIFI_AP);
-  WiFi.softAP("AssetMonitor_Config", "setpassword"); // Consider a more secure password or no password
-  Serial.print("Config Portal Started. Connect to AP 'AssetMonitor_Config', IP: ");
-  Serial.println(WiFi.softAPIP());
+  WiFi.softAP("AssetMonitor_Config", "setpassword");
+  Serial.print("Config Portal Started. Connect to AP 'AssetMonitor_Config', IP: "); 
+  Serial.println(WiFi.softAPIP());                                                    
   server.on("/", HTTP_GET, [](){ server.send(200, "text/html", wifiConfigHTML()); });
-  server.on("/wifi_save_config", HTTP_POST, handleWifiConfigPost); // Ensure this route is correct
+  server.on("/wifi_save_config", HTTP_POST, handleWifiConfigPost);
   server.begin();
-  while (true) { server.handleClient(); delay(10); } // Blocking loop for config portal
+  while (true) { server.handleClient(); delay(10); }
 }
 
 void setupWiFiSmart() {
-  Preferences localPrefs; // Use local instance
-  String ssid_from_prefs = "";
-  String pass_from_prefs = "";
-
-  if (localPrefs.begin("assetmon", true)) { // true for read-only
-    ssid_from_prefs = localPrefs.getString("ssid", "");
-    pass_from_prefs = localPrefs.getString("pass", "");
-    localPrefs.end();
-  } else {
-      Serial.println("setupWiFiSmart: Failed to open preferences.");
+  prefs.begin("assetmon", true);
+  String ssid_from_prefs = prefs.getString("ssid", ""); 
+  String pass_from_prefs = prefs.getString("pass", ""); 
+  prefs.end();
+  if (ssid_from_prefs.length() == 0) { 
+    Serial.println("SSID not found. Starting Config Portal."); 
+    startConfigPortal(); 
+    return; 
   }
-
-  if (ssid_from_prefs.length() == 0) {
-    Serial.println("SSID not found in preferences. Starting Config Portal.");
-    startConfigPortal(); // This will block until configured
-    return; // Should not be reached if startConfigPortal blocks
-  }
-
   strncpy(wifi_ssid, ssid_from_prefs.c_str(), 32); wifi_ssid[32] = '\0';
   strncpy(wifi_pass, pass_from_prefs.c_str(), 64); wifi_pass[64] = '\0';
-
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifi_ssid, wifi_pass);
   Serial.printf("Connecting to %s", wifi_ssid);
   for (int i=0; i<20 && WiFi.status()!=WL_CONNECTED; i++) { delay(500); Serial.print("."); }
-  Serial.println(); // Newline after dots
-
+  Serial.println(); 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("Connected! IP: " + WiFi.localIP().toString());
   } else {
-    Serial.println("WiFi connection failed. Starting Config Portal.");
-    startConfigPortal(); // Fallback to config portal
+    Serial.println("\nWiFi failed. Starting config portal."); 
+    startConfigPortal();
   }
 }
-// --- End WiFi Config Section ---
 
-// --- Time Setup Function --- MOVED HERE, OUTSIDE of setup()
-void setupTime() {
-  // Use tzOffset from config. Ensure config is loaded before this.
-  // configTime's first param is offset in seconds from UTC.
-  // configTime's second param is daylight offset in seconds (0 if not used or handled by TZ string).
-  configTime(config.tzOffset, 0, "pool.ntp.org", "time.nist.gov", "europe.pool.ntp.org");
-  
-  // Example of setting a TZ string for more complex DST rules (e.g., UK GMT/BST)
-  // This would override the simple offsets from configTime if used *after* it for time functions like localtime()
-  // setenv("TZ", "GMT0BST,M3.5.0/1,M10.5.0/2", 1); // For UK
-  // tzset(); // Apply the TZ environment variable
-
-  Serial.print("Waiting for NTP time sync...");
-  time_t now = time(nullptr); 
-  int retry = 0;
-  // Wait until time is past a reasonable point (e.g., after 2001)
-  while (now < 1000000000 && retry < 60) { // Roughly check if time is after year 2001
-    delay(500); 
-    Serial.print("."); 
-    now = time(nullptr); 
-    retry++; 
-  }
-  Serial.println(); // Newline
-
-  if (now < 1000000000) {
-    Serial.println("NTP time sync failed. Using system time (if any).");
-  } else {
-    Serial.println("NTP time sync successful.");
-    struct tm timeinfo;
-    getLocalTime(&timeinfo); // Updates timeinfo based on TZ settings
-    Serial.printf("Current local time: %s", asctime(&timeinfo)); // asctime() adds a newline
-  }
-}
-// --- End Time Setup ---
-
-
-// CONFIG LOAD/SAVE
 void loadConfig() {
   Preferences localPrefs; 
   bool prefsOpenedForRead = localPrefs.begin("assetmon", true); 
 
   if (!prefsOpenedForRead) {
+    Serial.println("loadConfig: Failed to open preferences in read-only, trying read-write.");
     prefsOpenedForRead = localPrefs.begin("assetmon", false); 
   }
 
@@ -254,13 +198,13 @@ void loadConfig() {
     Serial.println("loadConfig: Failed to open preferences. Using defaults.");
     config.assetCount = 1; 
     config.maxEvents = 100;
-    strcpy(config.assets[0].name, "Default Asset"); config.assets[0].pin = 0;
+    strcpy(config.assets[0].name, "Default Asset"); config.assets[0].pin = 0; 
     for (int i = 0; i < 5; ++i) {
         strncpy(config.downtimeReasons[i], DEFAULT_DOWNTIME_REASONS[i], sizeof(config.downtimeReasons[i]) - 1);
         config.downtimeReasons[i][sizeof(config.downtimeReasons[i]) - 1] = '\0';
     }
     config.tzOffset = 0;
-    config.longStopThresholdSec = 5 * 60;
+    config.longStopThresholdSec = 5 * 60; 
     return; 
   }
 
@@ -271,9 +215,9 @@ void loadConfig() {
       goto use_defaults_and_save; 
     }
     Serial.println("loadConfig: Configuration loaded from Preferences.");
-    if (config.longStopThresholdSec == 0 && config.maxEvents !=0 ) { // Example migration/default for new field
+    if (config.longStopThresholdSec == 0 && config.maxEvents !=0 ) { 
         config.longStopThresholdSec = 5*60; 
-        Serial.println("loadConfig: Initialized longStopThresholdSec.");
+        Serial.println("loadConfig: Initialized longStopThresholdSec to default 5 minutes.");
     }
   } else {
     Serial.println("loadConfig: No 'cfg' key. Using defaults and saving.");
@@ -282,40 +226,65 @@ use_defaults_and_save:
     config.maxEvents = 1000;
     strcpy(config.assets[0].name, "Line 1"); config.assets[0].pin = 4;
     strcpy(config.assets[1].name, "Line 2"); config.assets[1].pin = 12;
-    for (uint8_t i = config.assetCount; i < MAX_ASSETS; ++i) {
-        strcpy(config.assets[i].name, "");
+    for (uint8_t i = config.assetCount; i < MAX_ASSETS; ++i) { 
+        strcpy(config.assets[i].name, ""); 
         config.assets[i].pin = 0; 
     }
     for (int i = 0; i < 5; ++i) {
       strncpy(config.downtimeReasons[i], DEFAULT_DOWNTIME_REASONS[i], sizeof(config.downtimeReasons[i]) - 1);
       config.downtimeReasons[i][sizeof(config.downtimeReasons[i]) - 1] = '\0';
     }
-    config.tzOffset = 0;
+    config.tzOffset = 0; 
     config.longStopThresholdSec = 5*60; 
     
-    // Important: end read-only session if it was open, before saveConfig tries to open for write
     if(prefsOpenedForRead) localPrefs.end(); 
-    saveConfig(); // Save the defaults
-    // No need to re-read here, config struct is already populated with defaults
+    saveConfig(); 
   }
   
-  if (prefsOpenedForRead) { // Ensure it's ended if it was opened
+  if (prefsOpenedForRead) { 
     localPrefs.end(); 
   }
 }
 
 void saveConfig() { 
   Preferences localSavePrefs; 
+  
   if (!localSavePrefs.begin("assetmon", false)) { 
     Serial.println("saveConfig: Failed to begin preferences for writing.");
     return; 
   }
+  
   if (localSavePrefs.putBytes("cfg", &config, sizeof(config)) == sizeof(config)) {
-    Serial.println("saveConfig: Configuration saved.");
+     Serial.println("saveConfig: Configuration saved successfully.");
   } else {
-    Serial.println("saveConfig: Error writing configuration.");
+     Serial.println("saveConfig: Error writing configuration to preferences.");
   }
   localSavePrefs.end(); 
+}
+
+void setupTime() {
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov"); 
+  setenv("TZ", "GMT0BST,M3.5.0/1,M10.5.0/2", 1); 
+  tzset(); 
+
+  Serial.print("Waiting for NTP time sync...");
+  time_t now_time = time(nullptr); 
+  int retry = 0;
+  while (now_time < 1000000000 && retry < 60) { 
+    delay(500); 
+    Serial.print("."); 
+    now_time = time(nullptr); 
+    retry++; 
+  }
+  Serial.println(" done");
+
+  if (now_time >= 1000000000) {
+    struct tm timeinfo;
+    getLocalTime(&timeinfo); 
+    Serial.printf("NTP sync successful. Current local time: %s", asctime(&timeinfo)); 
+  } else {
+    Serial.println("NTP time sync failed. Using system time (if any).");
+  }
 }
 
 void setup() {
@@ -328,23 +297,22 @@ void setup() {
   }
   Serial.println("SPIFFS initialized.");
 
-  // It's generally safer for loadConfig/saveConfig to manage their own Preferences instances.
-  // The global 'prefs' object isn't strictly needed if all uses are localized.
-  // If you were to use the global 'prefs' object:
-  // if (!prefs.begin("assetmon", false)) { 
-  //   Serial.println("Global prefs.begin() failed!"); 
-  // } else {
-  //   Serial.println("Global preferences initialized.");
-  //   prefs.end(); // Close if only used for an initial check
-  // }
+  if (!prefs.begin("assetmon", false)) { 
+    Serial.println("Global prefs.begin() failed! Default settings will be used and may not save.");
+  } else {
+    Serial.println("Global Preferences initialized.");
+  }
 
-  loadConfig(); // Load app config (assets, etc.)
-  setupWiFiSmart(); // Setup WiFi connection or config portal
-  setupTime(); // Setup time from NTP using tzOffset from loaded config
+  loadConfig();
+  Serial.println("Configuration loaded/initialized.");
+
+  setupWiFiSmart(); 
+  setupTime(); 
+  Serial.println("WiFi and Time setup complete.");
 
   Serial.printf("Initializing %u assets defined in config...\n", config.assetCount);
   for (uint8_t i = 0; i < config.assetCount; ++i) {
-    if (i < MAX_ASSETS) { // Boundary check
+    if (i < MAX_ASSETS) { 
       pinMode(config.assets[i].pin, INPUT_PULLUP);
       assetStates[i].lastState = digitalRead(config.assets[i].pin);
       assetStates[i].lastChangeTime = time(nullptr);
@@ -353,24 +321,24 @@ void setup() {
       assetStates[i].stoppedTime = 0;
       assetStates[i].runCount = 0;
       assetStates[i].stopCount = 0;
-      assetStates[i].lastEventTime = 0;
+      assetStates[i].lastEventTime = 0; 
       assetStates[i].lastRunDuration = 0;
       assetStates[i].lastStopDuration = 0;
       Serial.printf("Asset %u ('%s', pin %u) initialized. Initial state: %s\n",
                     i, config.assets[i].name, config.assets[i].pin,
-                    assetStates[i].lastState ? "HIGH/RUNNING" : "LOW/STOPPED");
+                    assetStates[i].lastState ? "HIGH/INPUT_PULLUP (implies RUNNING for active LOW)" : "LOW (implies STOPPED for active LOW)");
     }
   }
-
-  // Main pages
+  
   server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
   server.on("/dashboard", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
   server.on("/config", HTTP_GET, []() { server.send(200, "text/html", htmlConfig()); });
-  server.on("/events", HTTP_GET, []() { server.send(200, "text/html", htmlEvents()); });
+  // server.on("/events", HTTP_GET, []() { server.send(200, "text/html", htmlEvents()); }); // Old way
+  server.on("/events", HTTP_GET, sendHtmlEventsPage); // New chunked way
   server.on("/asset", HTTP_GET, []() {
     if (server.hasArg("idx")) {
       uint8_t idx = server.arg("idx").toInt();
-      if (idx < config.assetCount && idx < MAX_ASSETS) { // Check against MAX_ASSETS too
+      if (idx < config.assetCount && idx < MAX_ASSETS) { 
         server.send(200, "text/html", htmlAssetDetail(idx));
         return;
       }
@@ -378,23 +346,14 @@ void setup() {
     server.send(404, "text/plain", "Asset not found or index invalid");
   });
 
-  // Analytics
   server.on("/analytics", HTTP_GET, []() { server.send(200, "text/html", htmlAnalytics()); });
   server.on("/analytics-compare", HTTP_GET, []() { server.send(200, "text/html", htmlAnalyticsCompare()); });
-  
-  // WiFi Reconfiguration
-  // The GET request to /reconfigure_wifi will now be handled by handleWiFiReconfigurePost
-  // which calls startConfigPortal().
-  server.on("/reconfigure_wifi", HTTP_GET, handleWiFiReconfigurePost); // Changed from POST to GET to simplify triggering
-                                                                    // Or keep as POST if you have a form submitting to it.
-                                                                    // The current handleWiFiReconfigurePost doesn't expect form data.
+  server.on("/reconfigure_wifi", HTTP_POST, handleWiFiReconfigurePost); 
 
-  // Config and Log actions
   server.on("/save_config", HTTP_POST, handleConfigPost);
   server.on("/clear_log", HTTP_POST, handleClearLog);
   server.on("/export_log", HTTP_GET, handleExportLog);
 
-  // API Endpoints
   server.on("/api/summary", HTTP_GET, handleApiSummary);
   server.on("/api/events", HTTP_GET, handleApiEvents);
   server.on("/api/config", HTTP_GET, handleApiConfig);
@@ -403,118 +362,106 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   server.begin();
-  Serial.println("Web server started. Device is ready."); 
+  Serial.println("Web server started. Device is ready.");
 }
-
-// --- loop() function and other function definitions follow ---
-// (Your existing loop, logEvent, formatMMSS, eventToCSV, urlDecode, HTML generators, API handlers, etc.)
-// Ensure the definition for handleConfigPost, htmlDashboard, etc., are present below.
 
 void loop() {
   server.handleClient();
   time_t now = time(nullptr);
   for (uint8_t i = 0; i < config.assetCount; ++i) {
-    if (i >= MAX_ASSETS) continue; // Should not happen if config.assetCount is constrained
+    if (i >= MAX_ASSETS) continue; 
 
-    bool currentState = digitalRead(config.assets[i].pin); // Read current pin state
-    
-    if (currentState != assetStates[i].lastState) {
-      unsigned long elapsedSinceLastChange = now - assetStates[i].lastChangeTime;
-      unsigned long currentRunDuration = 0;
-      unsigned long currentStopDuration = 0;
-
-      if (currentState) { // Pin is HIGH - asset just STARTED running
-        assetStates[i].stoppedTime += elapsedSinceLastChange; // Add elapsed time to total stopped time
-        assetStates[i].runCount++;
-        currentStopDuration = elapsedSinceLastChange; // This was the duration of the stop that just ended
-        assetStates[i].lastStopDuration = currentStopDuration;
-        assetStates[i].lastRunDuration = 0; // Reset last run duration as a new run is starting
-        logEvent(i, currentState, now, nullptr, 0, currentStopDuration);
-      } else { // Pin is LOW - asset just STOPPED running
-        assetStates[i].runningTime += elapsedSinceLastChange; // Add elapsed time to total running time
+    bool current_state = digitalRead(config.assets[i].pin); 
+    if (current_state != assetStates[i].lastState) {
+      unsigned long elapsed = now - assetStates[i].lastChangeTime;
+      unsigned long runDuration = 0;
+      unsigned long stopDuration = 0;
+      if (current_state) { // Assuming active LOW, so HIGH means STOPPED, transition to HIGH is a STOP event
+        assetStates[i].runningTime += elapsed; // The period that just ended was a RUN period
         assetStates[i].stopCount++;
-        currentRunDuration = elapsedSinceLastChange; // This was the duration of the run that just ended
-        assetStates[i].lastRunDuration = currentRunDuration;
-        assetStates[i].lastStopDuration = 0; // Reset last stop duration as a new stop is starting
-        logEvent(i, currentState, now, nullptr, currentRunDuration, 0);
+        runDuration = elapsed; 
+        assetStates[i].lastRunDuration = runDuration;
+        assetStates[i].lastStopDuration = 0; 
+        logEvent(i, false, now, nullptr, runDuration, 0); // Log STOP event (state=false)
       }
-      assetStates[i].lastState = currentState;
+      else { // Transition to LOW means STARTED
+        assetStates[i].stoppedTime += elapsed; // The period that just ended was a STOP period
+        assetStates[i].runCount++;
+        stopDuration = elapsed; 
+        assetStates[i].lastStopDuration = stopDuration;
+        assetStates[i].lastRunDuration = 0; 
+        logEvent(i, true, now, nullptr, 0, stopDuration); // Log START event (state=true)
+      }
+      assetStates[i].lastState = current_state; // Save the pin's current state (HIGH or LOW)
       assetStates[i].lastChangeTime = now;
-      assetStates[i].lastEventTime = now; // Update last event time
     }
   }
-  delay(200); // Poll inputs every 200ms
+  delay(200); 
 }
 
-// LOGGING (now with runDuration, stopDuration fields)
+// In logEvent, 'state' parameter now means machine RUNNING (true) or STOPPED (false)
+// This aligns with typical understanding, not the direct pin state if active LOW.
+void logEvent(uint8_t assetIdx, bool machineIsRunning, time_t now, const char* note, unsigned long runDuration, unsigned long stopDuration) {
+  if (assetIdx >= MAX_ASSETS) return; 
 
-void logEvent(uint8_t assetIdx, bool state, time_t now, const char* note, unsigned long runDuration, unsigned long stopDuration) {
-  if (assetIdx >= MAX_ASSETS) return; // Boundary check
-
-  AssetState& as = assetStates[assetIdx]; // Get reference to the specific asset's state
-
-  // Calculate overall metrics up to this event
-  // Note: runningTime and stoppedTime in AssetState are cumulative *excluding* the current ongoing period.
-  // For the event log, we want the state *at the moment of the event*.
-  // The runDuration and stopDuration passed to this function are for the *completed* phase that just ended.
-
-  unsigned long totalRunningTimeForEvent = as.runningTime;
-  unsigned long totalStoppedTimeForEvent = as.stoppedTime;
-
-  // If the event is a START, the 'stopDuration' that just completed is added to totalStoppedTime.
-  // If the event is a STOP, the 'runDuration' that just completed is added to totalRunningTime.
-  // This logic is already handled before calling logEvent by updating as.runningTime and as.stoppedTime in loop().
-
-  float avail = (totalRunningTimeForEvent + totalStoppedTimeForEvent) > 0 ? (100.0 * totalRunningTimeForEvent / (totalRunningTimeForEvent + totalStoppedTimeForEvent)) : 0;
-  float total_runtime_min = totalRunningTimeForEvent / 60.0;
-  float total_downtime_min = totalStoppedTimeForEvent / 60.0;
+  AssetState& as = assetStates[assetIdx];
+  // These are cumulative totals *before* the current just-ended period.
+  unsigned long current_total_runningTime = as.runningTime;
+  unsigned long current_total_stoppedTime = as.stoppedTime;
   
-  // MTBF/MTTR calculation:
-  // MTBF = Total Running Time / Number of Stops
-  // MTTR = Total Stopped Time / Number of Stops
-  // These should ideally use the *completed* running and stopped periods.
-  float mtbf_val = (as.stopCount > 0) ? (float)totalRunningTimeForEvent / as.stopCount : 0; // MTBF in seconds
-  float mttr_val = (as.stopCount > 0) ? (float)totalStoppedTimeForEvent / as.stopCount : 0; // MTTR in seconds
+  float avail = (current_total_runningTime + current_total_stoppedTime) > 0 
+                ? (100.0 * current_total_runningTime / (current_total_runningTime + current_total_stoppedTime)) 
+                : (machineIsRunning ? 100.0 : 0.0); 
+  float total_runtime_min = current_total_runningTime / 60.0;
+  float total_downtime_min = current_total_stoppedTime / 60.0;
   
-  mtbf_val = mtbf_val / 60.0; // Convert to minutes
-  mttr_val = mttr_val / 60.0; // Convert to minutes
+  // MTBF/MTTR calculation should use the state *after* the event for counts.
+  // If it's a STOP event (machineIsRunning = false), stopCount for MTBF calculation is relevant.
+  // If it's a START event (machineIsRunning = true), a stop has just ended, so stopCount for MTTR is relevant.
+  // The as.stopCount is the count *before* this event.
+  uint32_t relevant_stop_count_for_mtbf = as.stopCount; // If machine just stopped, this is the new total number of stops.
+  uint32_t relevant_stop_count_for_mttr = as.stopCount; // If machine just started, this is the number of stops that have completed.
 
+  float mtbf_val = (relevant_stop_count_for_mtbf > 0) ? (float)current_total_runningTime / relevant_stop_count_for_mtbf / 60.0 : 0; 
+  float mttr_val = (relevant_stop_count_for_mttr > 0) ? (float)current_total_stoppedTime / relevant_stop_count_for_mttr / 60.0 : 0; 
 
-  struct tm * ti = localtime(&now); // Use localtime for display based on TZ settings
+  struct tm * ti = localtime(&now);
   char datebuf[11], timebuf[9];
-  strftime(datebuf, sizeof(datebuf), "%d/%m/%Y", ti); // DD/MM/YYYY
-  strftime(timebuf, sizeof(timebuf), "%H:%M:%S", ti); // HH:MM:SS
+  strftime(datebuf, sizeof(datebuf), "%d/%m/%Y", ti);
+  strftime(timebuf, sizeof(timebuf), "%H:%M:%S", ti);
 
   File f = SPIFFS.open(LOG_FILENAME, FILE_APPEND);
   if (!f) { Serial.println("Failed to open log file for writing!"); return; }
-  
   f.printf("%s,%s,%s,%s,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%u,%s,%s,%s\n",
     datebuf, timebuf, config.assets[assetIdx].name,
-    state ? "START" : "STOP", // Event Type
-    state,                    // Current State (1 for START/Running, 0 for STOP/Stopped)
-    avail, total_runtime_min, total_downtime_min, 
-    mtbf_val, mttr_val,
-    as.stopCount,             // Number of stops recorded so far
-    (runDuration > 0 ? formatMMSS(runDuration).c_str() : ""),   // Duration of the run phase that just ENDED (if event is STOP)
-    (stopDuration > 0 ? formatMMSS(stopDuration).c_str() : ""), // Duration of the stop phase that just ENDED (if event is START)
+    machineIsRunning ? "START" : "STOP", // Event Type
+    machineIsRunning ? 1 : 0,            // State (1 for running, 0 for stopped)
+    avail, total_runtime_min, total_downtime_min, mtbf_val, mttr_val,
+    as.stopCount, // Log the stop count *at the time of the event*
+    (runDuration > 0 ? formatMMSS(runDuration).c_str() : ""),   
+    (stopDuration > 0 ? formatMMSS(stopDuration).c_str() : ""), 
     note ? note : ""
   );
   f.close();
-  // as.lastEventTime = now; // This is already updated in loop()
-  Serial.printf("Event logged for %s: %s\n", config.assets[assetIdx].name, state ? "START" : "STOP");
+  as.lastEventTime = now; 
+  Serial.printf("Event logged for %s: %s. RunD: %s, StopD: %s. Stops: %u\n", 
+    config.assets[assetIdx].name,
+    machineIsRunning ? "START" : "STOP",
+    formatMMSS(runDuration).c_str(),
+    formatMMSS(stopDuration).c_str(),
+    as.stopCount
+  );
 }
 
-// MM:SS format helper for durations
 String formatMMSS(unsigned long seconds) {
-  if (seconds == 0 && seconds != assetStates[0].lastRunDuration && seconds != assetStates[0].lastStopDuration) return ""; // Avoid returning "" for actual zero durations if needed
-  unsigned int min = seconds / 60;
-  unsigned int sec = seconds % 60;
+  if (seconds == 0) return ""; 
+  unsigned int min_val = seconds / 60; 
+  unsigned int sec_val = seconds % 60; 
   char buf[8];
-  sprintf(buf, "%02u:%02u", min, sec);
+  sprintf(buf, "%02u:%02u", min_val, sec_val);
   return String(buf);
 }
 
-// Converts an Event to a CSV line using UK local time (BST/GMT)
 String eventToCSV(const Event& e) {
   struct tm * ti = localtime(&e.timestamp);
   char datebuf[16], timebuf[16];
@@ -563,19 +510,19 @@ String urlEncode(const String& str) {
 
 String urlDecode(const String& str) {
   String decoded = "";
-  char temp[] = "0x00"; // For strtol
+  char temp[] = "0x00";
   unsigned int len = str.length();
   unsigned int i = 0;
   while (i < len) {
     char c = str.charAt(i);
     if (c == '%') {
-      if (i + 2 < len) {
-        temp[2] = str.charAt(i + 1);
-        temp[3] = str.charAt(i + 2);
+      if (i+2 < len) {
+        temp[2] = str.charAt(i+1);
+        temp[3] = str.charAt(i+2);
         decoded += char(strtol(temp, NULL, 16));
         i += 3;
-      } else { // Invalid percent encoding, skip
-        i++;
+      } else { 
+        i++; 
       }
     } else if (c == '+') {
       decoded += ' ';
@@ -588,7 +535,6 @@ String urlDecode(const String& str) {
   return decoded;
 }
 
-// --- htmlDashboard() function ---
 String htmlDashboard() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Dashboard</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
@@ -598,31 +544,31 @@ String htmlDashboard() {
   html += "body{font-family:Roboto,Arial,sans-serif;background:#f3f7fa;margin:0;padding:0;}";
   html += "header{background:#1976d2;color:#fff;padding:1.3rem 0 1.3rem 2rem;text-align:left;font-size:2em;font-weight:700;box-shadow:0 2px 10px #0001;}";
   html += ".nav{display:flex;justify-content:center;align-items:center;gap:1rem;margin:1.5rem 0 1rem 0;flex-wrap:wrap;}";
-  html += ".nav .nav-btn{background:#fff;color:#1976d2;border:none;border-radius:8px;padding:0.7em 1.3em;font-size:1.13em;font-weight:700;box-shadow:0 2px 12px #1976d222;cursor:pointer;transition:.2s;text-decoration:none;}"; // Added text-decoration
+  html += ".nav .nav-btn{background:#fff;color:#1976d2;border:none;border-radius:8px;padding:0.7em 1.3em;font-size:1.13em;font-weight:700;box-shadow:0 2px 12px #1976d222;cursor:pointer;transition:.2s;text-decoration:none;}"; 
   html += ".nav .nav-btn:hover{background:#e3f0fc;}";
   html += ".main{max-width:1200px;margin:1rem auto;padding:1rem;}";
   html += ".card{background:#fff;border-radius:10px;box-shadow:0 2px 16px #0002;margin-bottom:1.3rem;padding:1.3rem;}";
   html += "#chart-container{width:100%;overflow-x:auto;}";
   html += ".statrow{display:flex;gap:1.5em;flex-wrap:wrap;justify-content:center;margin:2em 0 2em 0;}";
-  html += ".stat{flex:1 1 220px;border-radius:10px;padding:1.2em;text-align:left;font-size:1.1em;margin:0.4em 0;box-shadow:0 2px 8px #0001;font-weight:500;background:#f5f7fa;border:2px solid #e0e0e0;min-width:200px;}"; // Added min-width
+  html += ".stat{flex:1 1 220px;border-radius:10px;padding:1.2em;text-align:left;font-size:1.1em;margin:0.4em 0;box-shadow:0 2px 8px #0001;font-weight:500;background:#f5f7fa;border:2px solid #e0e0e0;min-width:200px;}"; 
   html += ".stat.stopped{background:#ffeaea;border-color:#f44336;}";
   html += ".stat.running{background:#e6fbe7;border-color:#54c27c;}";
   html += "table{width:100%;border-collapse:collapse;font-size:1em;margin-top:2em;}";
   html += "th,td{padding:0.7em 0.5em;text-align:left;border-bottom:1px solid #eee;}";
   html += "th{background:#2196f3;color:#fff;}";
   html += "tr{background:#fcfcfd;} tr:nth-child(even){background:#f3f7fa;}";
-  html += "td:last-child .nav-btn{margin:0;}";
-  // html += ".nav-btn{background:#fff;color:#1976d2;border:none;border-radius:8px;padding:0.45em 1.1em;font-size:1em;font-weight:700;box-shadow:0 2px 12px #1976d222;cursor:pointer;margin:0 0.1em;}"; // Redundant with .nav .nav-btn
-  // html += ".nav-btn:hover{background:#e3f0fc;}"; // Redundant
+  html += "td:last-child .nav-btn{margin:0;}"; 
+  html += ".nav-btn{background:#fff;color:#1976d2;border:none;border-radius:8px;padding:0.45em 1.1em;font-size:1em;font-weight:700;box-shadow:0 2px 12px #1976d222;cursor:pointer;margin:0 0.1em;}"; 
+  html += ".nav-btn:hover{background:#e3f0fc;}";
   html += "@media (max-width:900px){.main{padding:0.5em;}.statrow{gap:0.5em;}.stat{min-width:150px;max-width:100%;font-size:1em;padding:0.6em;}}";
-  html += "@media (max-width:700px){header{font-size:1.3em;padding:1em 0 1em 1em;}.nav{flex-direction:column;align-items:center;margin:1em 0 1em 0;gap:0.4em;}.card{padding:0.7em;}.statrow{gap:0.4em;max-width:100%;}.stat{min-width: calc(50% - 0.4em);}}"; // Adjusted .stat for 2-column
+  html += "@media (max-width:700px){header{font-size:1.3em;padding:1em 0 1em 1em;}.nav{flex-direction:column;align-items:center;margin:1em 0 1em 0;gap:0.4em;}.card{padding:0.7em;}.statrow{gap:0.4em;max-width:100%;}}"; 
   html += "</style>";
   html += "</head><body>";
   html += "<header>Dashboard</header>";
   html += "<nav class='nav'>";
   html += "<form action='/events' style='margin:0;'><button type='submit' class='nav-btn'>Event Log</button></form>";
   html += "<form action='/config' style='margin:0;'><button type='submit' class='nav-btn'>Setup</button></form>";
-  html += "<a href='/analytics-compare' class='nav-btn'>Compare Assets</a>"; // Changed to <a> tag
+  html += "<a href='/analytics-compare' class='nav-btn'>Compare Assets</a>";
   html += "<form action='/export_log' style='margin:0;'><button type='submit' class='nav-btn'>Export CSV</button></form>";
   html += "</nav>";
   html += "<div class='main'>";
@@ -630,16 +576,15 @@ String htmlDashboard() {
   html += "<div id='chart-container'><canvas id='barChart' height='200'></canvas></div>";
   html += "<div class='statrow' id='statrow'></div>";
   html += "<div style='overflow-x:auto;'><table id='summaryTable'><thead><tr>";
-  html += "<th>Name</th><th>State</th><th>Avail (%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th></th></tr></thead><tbody></tbody></table>";
-  html += "</div></div>";
+  html += "<th>Name</th><th>State</th><th>Avail (%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Actions</th></tr></thead><tbody></tbody></table>"; 
+  html += "</div></div></div>"; 
   html += "<script>";
   html += R"rawliteral(
-// Format float minutes as hh:mm:ss
 function formatHHMMSS(val) {
   if (isNaN(val) || val < 0.01) return "00:00:00";
   let totalSeconds = Math.round(val * 60);
   let h = Math.floor(totalSeconds / 3600);
-  let m = Math.floor((totalSeconds % 3600) / 60) % 60; // Ensure minutes are within 0-59
+  let m = Math.floor((totalSeconds % 3600) / 60) % 60; 
   let s = totalSeconds % 60;
   return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
 }
@@ -647,20 +592,22 @@ let chartObj=null;
 function updateDashboard() {
   fetch('/api/summary').then(r=>r.json()).then(data=>{
     let tbody = document.querySelector('#summaryTable tbody');
+    if (!tbody) return; 
     let assets = data.assets;
     let rows = tbody.rows;
     let statrow = document.getElementById('statrow');
-    statrow.innerHTML = ''; // Clear previous stat cards
-    let n=assets.length;
+    if(statrow) statrow.innerHTML = ''; 
+    
+    let n = assets.length;
     for(let i=0;i<n;++i){
       let asset = assets[i];
-      let stateClass = asset.state==1 ? "running" : "stopped";
-      // Table row
+      let stateClass = asset.state==1 ? "running" : "stopped"; // Assuming state 1 is running from API
       let row = rows[i];
       if (!row) {
         row = tbody.insertRow();
-        for (let j=0;j<9;++j) row.insertCell(); // Add 9 cells for 9 columns
+        for (let j=0;j<9;++j) row.insertCell(); 
       }
+      let assetNameEncoded = encodeURIComponent(asset.name);
       let v0 = asset.name,
           v1 = `<span style="color:${asset.state==1?'#256029':'#b71c1c'};font-weight:bold">${asset.state==1?'RUNNING':'STOPPED'}</span>`,
           v2 = asset.availability.toFixed(2),
@@ -669,14 +616,16 @@ function updateDashboard() {
           v5 = formatHHMMSS(asset.mtbf),
           v6 = formatHHMMSS(asset.mttr),
           v7 = asset.stop_count,
-          v8 = `<form action='/analytics' method='GET' style='display:inline;'><input type='hidden' name='asset' value="${encodeURIComponent(asset.name)}"><button type='submit' class='nav-btn'>Analytics</button></form>`; // Corrected button text
+          v8 = `<form action='/analytics' method='GET' style='display:inline; margin:0;'><input type='hidden' name='asset' value="${assetNameEncoded}"><button type='submit' class='nav-btn'>Analytics</button></form>`;
       let vals = [v0,v1,v2,v3,v4,v5,v6,v7,v8];
       for(let j=0;j<9;++j) row.cells[j].innerHTML = vals[j];
-      // Stat card
-      let statHtml = `<div class='stat ${stateClass}'><b>${asset.name}</b><br>Avail: ${asset.availability.toFixed(1)}%<br>Run: ${formatHHMMSS(asset.total_runtime)}<br>Stops: ${asset.stop_count}</div>`; // Corrected class for state
-      statrow.innerHTML += statHtml;
+      
+      if(statrow) {
+        let statHtml = `<div class='stat ${stateClass}'><b>${asset.name}</b><br>Avail: ${asset.availability.toFixed(1)}%<br>Run: ${formatHHMMSS(asset.total_runtime)}<br>Stops: ${asset.stop_count}</div>`;
+        statrow.innerHTML += statHtml;
+      }
     }
-    while (rows.length > n) tbody.deleteRow(rows.length-1); // Remove extra rows if assets decrease
+    while (rows.length > n) tbody.deleteRow(rows.length-1); 
     
     let availData=[], names=[], runtimeData=[], downtimeData=[];
     for (let asset of assets) {
@@ -685,8 +634,11 @@ function updateDashboard() {
       downtimeData.push(asset.total_downtime);
       names.push(asset.name);
     }
-    let ctx = document.getElementById('barChart').getContext('2d');
-    if (!window.chartObj) { // Create chart if it doesn't exist
+    let ctxEl = document.getElementById('barChart'); 
+    if (!ctxEl) return; 
+    let ctx = ctxEl.getContext('2d'); 
+
+    if (!window.chartObj) {
       window.chartObj = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -705,22 +657,23 @@ function updateDashboard() {
           }
         }
       });
-    } else { // Update existing chart
+    } else {
       window.chartObj.data.labels = names;
       window.chartObj.data.datasets[0].data = availData;
       window.chartObj.data.datasets[1].data = runtimeData;
       window.chartObj.data.datasets[2].data = downtimeData;
       window.chartObj.update();
     }
-  });
+  }).catch(e => console.error("Dashboard update error:", e)); 
 }
-updateDashboard(); setInterval(updateDashboard, 5000);
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', updateDashboard); } 
+else { updateDashboard(); }
+setInterval(updateDashboard, 5000);
 )rawliteral";
   html += "</script></body></html>";
   return html;
 }
 
-// --- htmlAnalytics() function ---
 String htmlAnalytics() {
   String assetName = server.hasArg("asset") ? urlDecode(server.arg("asset")) : "";
   String html = "<!DOCTYPE html><html lang='en'><head><title>Analytics: ";
@@ -728,19 +681,19 @@ String htmlAnalytics() {
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
-  html += "<style>body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}th,td{text-align:left;}header{background:#1976d2;color:#fff;padding:1.3rem 0;text-align:center;box-shadow:0 2px 10px #0001;font-size:1.6em;font-weight:700;}"; // Added font size/weight
-  html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;} .nav a{text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;} .nav a:hover{background:#e3f0fc;}"; // Style for nav links
-  html += ".main{max-width:1100px;margin:1rem auto;padding:1rem;} .metrics{display:flex;flex-wrap:wrap;gap:1em;justify-content:center;margin-bottom:1.5em;} .metric{background:#fff;padding:1em;border-radius:8px;box-shadow:0 2px 8px #0001;text-align:center;flex:1 1 150px;font-size:1.1em;} .metric b{display:block;font-size:1.4em;color:#1976d2;}"; // KPI styles
-  html += ".controls{display:flex;flex-wrap:wrap;gap:1em;align-items:center;margin-bottom:1.5em;padding:1em;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0001;} .controls label{margin-right:0.5em;} .controls input[type=datetime-local]{padding:0.5em;border-radius:4px;border:1px solid #ccc;} .controls .toggle{display:flex;align-items:center;} .controls .toggle input{margin-right:0.3em;} .export-btn{margin-left:auto;padding:0.6em 1em;background:#66bb6a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;}"; // Controls styling
-  html += ".chartcard{background:#fff;padding:1.5em;border-radius:8px;box-shadow:0 2px 10px #0001;margin-bottom:1.5em;} .tablecard{background:#fff;padding:1.5em;border-radius:8px;box-shadow:0 2px 10px #0001;} table{width:100%;border-collapse:collapse;} th,td{padding:0.6em;border-bottom:1px solid #eee;} th{background:#e3f0fc;color:#1976d2;}"; // Card and table styles
+  html += "<style>body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}th,td{text-align:left;}header{background:#1976d2;color:#fff;padding:1.3rem 0;text-align:center;box-shadow:0 2px 10px #0001;font-size:1.6em;font-weight:700;}"; 
+  html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;} .nav a{text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;} .nav a:hover{background:#e3f0fc;}"; 
+  html += ".main{max-width:1100px;margin:1rem auto;padding:1rem;} .metrics{display:flex;flex-wrap:wrap;gap:1em;justify-content:center;margin-bottom:1.5em;} .metric{background:#fff;padding:1em;border-radius:8px;box-shadow:0 2px 8px #0001;text-align:center;flex:1 1 150px;font-size:1.1em;} .metric b{display:block;font-size:1.4em;color:#1976d2;}"; 
+  html += ".controls{display:flex;flex-wrap:wrap;gap:1em;align-items:center;margin-bottom:1.5em;padding:1em;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0001;} .controls label{margin-right:0.5em;} .controls input[type=datetime-local]{padding:0.5em;border-radius:4px;border:1px solid #ccc;} .controls .toggle{display:flex;align-items:center;} .controls .toggle input{margin-right:0.3em;} .export-btn{margin-left:auto;padding:0.6em 1em;background:#66bb6a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;}"; 
+  html += ".chartcard{background:#fff;padding:1.5em;border-radius:8px;box-shadow:0 2px 10px #0001;margin-bottom:1.5em;} .tablecard{background:#fff;padding:1.5em;border-radius:8px;box-shadow:0 2px 10px #0001;} table{width:100%;border-collapse:collapse;} th,td{padding:0.6em;border-bottom:1px solid #eee;} th{background:#e3f0fc;color:#1976d2;}"; 
   html += "@media (max-width:700px){.main{padding:0.5em;} .controls{flex-direction:column;align-items:stretch;} .controls label{width:100%;margin-bottom:0.5em;} .export-btn{margin-left:0;width:100%;text-align:center;} .metrics{gap:0.5em;} .metric{flex-basis:calc(50% - 0.5em);font-size:1em;} .metric b{font-size:1.2em;}}";
   html += "</style>";
   html += "</head><body>";
   html += "<header>Analytics: <span id='assetNameInHeader'>" + assetName + "</span></header>";
   html += "<nav class='nav'>";
-  html += "<a href='/'>Dashboard</a>"; // Changed to <a>
-  html += "<a href='/events'>Event Log</a>"; // Changed to <a>
-  html += "<a href='/analytics-compare'>Compare Assets</a>"; // Already <a>
+  html += "<a href='/'>Dashboard</a>";
+  html += "<a href='/events'>Event Log</a>";
+  html += "<a href='/analytics-compare' class='analytics-btn'>Compare Assets</a>"; 
   html += "</nav>";
   html += "<div class='main'>";
   html += "<div class='metrics' id='kpiMetrics'></div>";
@@ -757,13 +710,17 @@ String htmlAnalytics() {
   html += "<div class='chartcard'><canvas id='eventChart' style='width:100%;max-width:1050px;height:340px;'></canvas></div>";
   html += "<div class='tablecard'>";
   html += "<h3>Recent Events</h3><table style='width:100%;'><thead><tr>"
-          "<th>Date</th><th>Time</th><th>Asset</th><th>Event</th><th>Avail(%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Run Duration</th><th>Stop Duration</th><th>Note</th>" // Added <th> for Note
-          "</tr></thead><tbody id='recentEvents'></tbody></table></div>";
+          "<th>Date</th><th>Time</th><th>Asset</th><th>Event</th><th>Avail(%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Run Duration</th><th>Stop Duration</th><th>Note</th>" 
+          "</tr></thead><tbody id='recentEvents'></tbody></table></div>"; 
   html += "<script>";
   html += R"rawliteral(
+// ... (JavaScript for Analytics page, assumed to be okay for now based on no reported errors)
+// ... (Ensure floatMinToMMSS, mmssToSeconds, parseEventDate, toDatetimeLocal are defined)
+// ... (Ensure initAnalyticsPage, fetchAnalyticsData, setupRangePickers, renderKPIs, renderEventChart, renderRecentEvents are defined)
+// This is just a placeholder to indicate the full script for analytics should be here.
+// The critical fix for floatMinToMMSS was applied in a previous version.
 console.log('Analytics script started (v14 - Enhanced MTBF/MTTR tooltips).');
 
-// --- Utility Functions ---
 function floatMinToMMSS(val) { 
   if (typeof val === "string") val = parseFloat(val);
   if (isNaN(val) || val < 0) { 
@@ -795,33 +752,29 @@ function mmssToSeconds(mmss) {
   } else { 
     m = parseInt(parts[0], 10); s = parseInt(parts[1], 10);
   }
-  return (isNaN(h) ? 0 : h * 3600) + (isNaN(m) ? 0 : m * 60) + (isNaN(s) ? 0 : s);
+  if(isNaN(h) || isNaN(m) || isNaN(s)) return 0; 
+  return (h * 3600) + (m * 60) + s;
 }
 function parseEventDate(eventRow) {
   if (!eventRow || eventRow.length < 2) return new Date(0); 
   try {
     let [d, m, y] = eventRow[0].split('/').map(Number); let [hh, mm, ss] = eventRow[1].split(':').map(Number);
     if (isNaN(d) || isNaN(m) || isNaN(y) || isNaN(hh) || isNaN(mm) || isNaN(ss)) return new Date(0);
-    return new Date(Date.UTC(y, m - 1, d, hh, mm, ss)); // Use UTC to avoid timezone issues with date parsing
+    return new Date(Date.UTC(y, m - 1, d, hh, mm, ss));
   } catch (e) { console.error('Error parsing date for eventRow:', eventRow, e); return new Date(0); }
 }
-function toDatetimeLocal(dt) { // Converts a Date object to "yyyy-MM-ddThh:mm" for datetime-local input
+function toDatetimeLocal(dt) {
   if (!(dt instanceof Date) || isNaN(dt)) dt = new Date(); 
   try {
-    // Create a new date object adjusted for the local timezone offset for display purposes
-    const timezoneOffset = dt.getTimezoneOffset() * 60000; // offset in milliseconds
-    const localDate = new Date(dt.getTime() - timezoneOffset);
+    const timezoneOffset = dt.getTimezoneOffset() * 60000; const localDate = new Date(dt.getTime() - timezoneOffset);
     const pad = n => n < 10 ? '0' + n : n;
-    return localDate.getFullYear() + '-' + pad(localDate.getMonth() + 1) + '-' + pad(localDate.getDate()) +
-           'T' + pad(localDate.getHours()) + ':' + pad(localDate.getMinutes());
+    return localDate.getFullYear() + '-' + pad(localDate.getMonth() + 1) + '-' + pad(localDate.getDate()) + 'T' + pad(localDate.getHours()) + ':' + pad(localDate.getMinutes());
   } catch (e) {
     console.error('Error in toDatetimeLocal:', e, 'Input date:', dt);
-    const now = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)); // Fallback to current local time
-    return now.toISOString().slice(0, 16);
+    const now = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)); return now.toISOString().slice(0, 16);
   }
 }
 
-// --- Global Variables ---
 let asset = '';
 try {
   asset = decodeURIComponent(new URLSearchParams(window.location.search).get("asset") || "");
@@ -831,7 +784,6 @@ try {
 
 let allEvents = []; let eventChart = null; let filteredEventsGlobal = []; 
 
-// --- Core Logic ---
 function fetchAnalyticsData() {
   if (!asset) {
     console.warn('No asset specified, aborting fetch.');
@@ -844,8 +796,8 @@ function fetchAnalyticsData() {
     .then(rawEvents => {
       if (!Array.isArray(rawEvents)) { console.error('Fetched data is not an array:', rawEvents); allEvents = []; }
       else {
-        allEvents = rawEvents.map(line => (typeof line === 'string') ? line.split(',') : []) // Ensure lines are split
-                             .filter(eventRow => eventRow.length > 13 && eventRow[2] && eventRow[2].trim() === asset.trim()); // Filter by asset and ensure valid row length
+        allEvents = rawEvents.map(line => (typeof line === 'string') ? line.split(',') : [])
+                             .filter(eventRow => eventRow.length > 13 && eventRow[2] && eventRow[2].trim() === asset.trim());
       }
       if (allEvents.length === 0) {
         const kpiDiv = document.getElementById('kpiMetrics');
@@ -857,6 +809,15 @@ function fetchAnalyticsData() {
       console.error('Error fetching or processing analytics data:', error);
       const kpiDiv = document.getElementById('kpiMetrics');
       if (kpiDiv) kpiDiv.innerHTML = `<div class='metric'>Error loading data: ${error.message}</div>`;
+      const chartDiv = document.getElementById('eventChart');
+      if(chartDiv) { 
+        const ctx = chartDiv.getContext('2d');
+        if(ctx) { 
+            ctx.clearRect(0, 0, chartDiv.width, chartDiv.height);
+            ctx.textAlign = 'center';
+            ctx.fillText('Failed to load chart data.', chartDiv.width / 2, chartDiv.height / 2);
+        }
+      }
     });
 }
 function setupRangePickers() {
@@ -865,19 +826,15 @@ function setupRangePickers() {
     try {
       let eventDates = allEvents.map(e => parseEventDate(e)).filter(d => d.getTime() !== 0); 
       if (eventDates.length > 0) {
-        defaultToDate = new Date(Math.max.apply(null, eventDates)); 
-        defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); // Default to last 12 hours
-      } else { // Fallback if no valid dates parsed
-        defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
-      }
-    } catch (e) { // General fallback
-      defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
-    }
-  } else { // Fallback if no events
-    defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
-  }
-  document.getElementById('fromTime').value = toDatetimeLocal(defaultFromDate);
-  document.getElementById('toTime').value = toDatetimeLocal(defaultToDate);
+        defaultToDate = new Date(Math.max.apply(null, eventDates)); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
+      } else { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
+    } catch (e) { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
+  } else { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
+  
+  const fromTimeEl = document.getElementById('fromTime');
+  const toTimeEl = document.getElementById('toTime');
+  if(fromTimeEl) fromTimeEl.value = toDatetimeLocal(defaultFromDate);
+  if(toTimeEl) toTimeEl.value = toDatetimeLocal(defaultToDate);
   
   ['fromTime', 'toTime', 'showStart', 'showStop', 'showMTBF', 'showMTTR'].forEach(id => {
     const el = document.getElementById(id); if (el) el.onchange = renderEventChart;
@@ -885,7 +842,7 @@ function setupRangePickers() {
   const exportButton = document.getElementById('exportPng');
   if (exportButton) {
     exportButton.onclick = function () {
-      if (!eventChart) { console.warn('Export PNG: Chart not ready.'); return; }
+      if (!eventChart || !eventChart.canvas) { console.warn('Export PNG: Chart not ready or canvas missing.'); return; } 
       try { let url = eventChart.toBase64Image(); let a = document.createElement('a'); a.href = url; a.download = `analytics_${asset}.png`; a.click(); }
       catch (e) { console.error('Error exporting chart to PNG:', e); }
     };
@@ -896,13 +853,12 @@ function renderKPIs(currentFilteredEventsArray) {
   if (!currentFilteredEventsArray || currentFilteredEventsArray.length === 0) { kpiDiv.innerHTML = "<div class='metric'>No data for selected range</div>"; return; }
   try {
     const latestEvent = currentFilteredEventsArray[currentFilteredEventsArray.length - 1];
-    // Ensure all indices are valid before accessing
-    const stops = latestEvent[10] || '0';
-    const runtime = latestEvent[6] || '0';
-    const downtime = latestEvent[7] || '0';
-    const availability = latestEvent[5] || '0';
-    const mtbf = latestEvent[8] || '0';
-    const mttr = latestEvent[9] || '0';
+    const stops = latestEvent[10] !== undefined ? latestEvent[10] : '0';
+    const runtime = latestEvent[6] !== undefined ? latestEvent[6] : '0';
+    const downtime = latestEvent[7] !== undefined ? latestEvent[7] : '0';
+    const availability = latestEvent[5] !== undefined ? latestEvent[5] : '0';
+    const mtbf = latestEvent[8] !== undefined ? latestEvent[8] : '0';
+    const mttr = latestEvent[9] !== undefined ? latestEvent[9] : '0';
 
     kpiDiv.innerHTML =
       `<div class='metric'>Stops: <b>${stops}</b></div>
@@ -914,49 +870,60 @@ function renderKPIs(currentFilteredEventsArray) {
   } catch (e) { console.error('Error rendering KPIs:', e, 'Event data:', currentFilteredEventsArray.length > 0 ? currentFilteredEventsArray[currentFilteredEventsArray.length - 1] : 'No events'); kpiDiv.innerHTML = "<div class='metric'>Error rendering KPIs</div>"; }
 }
 function renderEventChart() {
-  if (!allEvents || allEvents.length === 0) { if (eventChart) { eventChart.destroy(); eventChart = null; } renderKPIs([]); return; } // Pass empty array to clear KPIs
+  const chartCanvas = document.getElementById('eventChart'); 
+  if (!chartCanvas) { console.error("Event chart canvas not found!"); return; }
+
+  if (!allEvents || allEvents.length === 0) { 
+    if (eventChart) { eventChart.destroy(); eventChart = null; } 
+    const ctx = chartCanvas.getContext('2d');
+    if(ctx){
+        ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+        ctx.textAlign = 'center'; ctx.font = '16px Roboto'; ctx.fillStyle = '#555';
+        ctx.fillText('No event data available for this asset.', chartCanvas.width / 2, chartCanvas.height / 2);
+    }
+    renderKPIs([]); 
+    return; 
+  }
   let fromDate, toDate;
   try { 
-    // Parse as UTC from the datetime-local input, then treat as local for filtering
-    // The datetime-local input provides a string like "YYYY-MM-DDTHH:MM" which is local time.
-    // new Date() will parse this as local time.
-    fromDate = new Date(document.getElementById('fromTime').value); 
-    toDate = new Date(document.getElementById('toTime').value); 
+    const fromTimeVal = document.getElementById('fromTime').value;
+    const toTimeVal = document.getElementById('toTime').value;
+    if(!fromTimeVal || !toTimeVal) { console.error("Date range pickers not found or empty."); return; }
+    fromDate = new Date(fromTimeVal); 
+    toDate = new Date(toTimeVal); 
+    if(isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) { console.error("Invalid date format from pickers."); return; }
   }
   catch (e) { console.error('Error parsing date/time input values:', e); return; }
 
-  const showStart = document.getElementById('showStart').checked; 
-  const showStop = document.getElementById('showStop').checked;
-  const showMTBF = document.getElementById('showMTBF').checked; 
-  const showMTTR = document.getElementById('showMTTR').checked;
+  const showStart = document.getElementById('showStart').checked; const showStop = document.getElementById('showStop').checked;
+  const showMTBF = document.getElementById('showMTBF').checked; const showMTTR = document.getElementById('showMTTR').checked;
   
   filteredEventsGlobal = allEvents.filter(eventRow => {
     try {
-      const eventDate = parseEventDate(eventRow); // parseEventDate returns UTC Date object
-      if (eventDate.getTime() === 0) return false; 
-      // Compare eventDate (UTC) with fromDate/toDate (which should be treated as local boundaries but parsed into Date objects)
-      // For correct filtering, convert fromDate and toDate to UTC if eventDate is UTC, or ensure consistent comparison.
-      // Since parseEventDate creates UTC dates, let's ensure from/to are also treated as such for comparison.
-      // However, datetime-local inputs are local. A robust way is to get UTC epoch ms for comparison.
-      const eventEpoch = eventDate.getTime();
-      const fromEpoch = fromDate.getTime();
-      const toEpoch = toDate.getTime();
-
-      if (eventEpoch < fromEpoch || eventEpoch > toEpoch) return false; 
+      const eventDate = parseEventDate(eventRow); if (eventDate.getTime() === 0) return false; 
+      if (eventDate < fromDate || eventDate > toDate) return false; 
       if (!eventRow[3]) return false; 
-      
       const eventType = eventRow[3].trim().toUpperCase();
       if (eventType === "START" && !showStart) return false;
       if (eventType === "STOP" && !showStop) return false; 
       return true;
-    } catch (e) { return false; }
+    } catch (e) { console.error("Error filtering event:", eventRow, e); return false; } 
   });
 
   renderKPIs(filteredEventsGlobal); 
-  if (filteredEventsGlobal.length === 0) { if (eventChart) { eventChart.destroy(); eventChart = null; } return; }
+  if (filteredEventsGlobal.length === 0) { 
+    if (eventChart) { eventChart.destroy(); eventChart = null; } 
+    const ctx = chartCanvas.getContext('2d');
+    if(ctx){
+        ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+        ctx.textAlign = 'center'; ctx.font = '16px Roboto'; ctx.fillStyle = '#555';
+        ctx.fillText('No data for selected range.', chartCanvas.width / 2, chartCanvas.height / 2);
+    }
+    return; 
+  }
 
   try {
-    let times = filteredEventsGlobal.map(e => e[1]); // HH:MM:SS (local time from log)
+    let times = filteredEventsGlobal.map(e => e[1]); 
     let avail = filteredEventsGlobal.map(e => parseFloat(e[5]));
     let mtbfValues = filteredEventsGlobal.map(e => parseFloat(e[8])); 
     let mttrValues = filteredEventsGlobal.map(e => parseFloat(e[9]));
@@ -964,52 +931,33 @@ function renderEventChart() {
     
     let pointColors = filteredEventsGlobal.map((e, index, arr) => {
       const eventType = e[3] ? e[3].trim().toUpperCase() : "";
-      let durationForStopDecision = "0:00"; // Default to ensure it's a valid mm:ss string
+      let durationForStopDecision = "0:0"; 
       if (eventType === "STOP") {
-         // For a STOP event, the relevant duration is the 'Stop Duration' of the *next* START event,
-         // or if it's the last event, its own 'Stop Duration' (which might be ongoing or just logged)
-         // The CSV format is: 11: RunDur, 12: StopDur
-         // A STOP event logs the RunDur that just ended. The StopDur is logged by the *next* START.
-         durationForStopDecision = e[12] || "0:00"; // This is the stop duration that *ended* if this event was a START
-                                                  // For a STOP event, this field is usually empty.
-                                                  // We need to look at the next event if it's a START
-        if (index + 1 < arr.length) {
-            const nextEvent = arr[index+1];
-            const nextEventType = nextEvent[3] ? nextEvent[3].trim().toUpperCase() : "";
-            if (nextEventType === "START") {
-                durationForStopDecision = nextEvent[12] || "0:00"; // Stop duration logged by the START event
-            }
-        } else {
-            // If this is the last STOP event, there's no subsequent START to log its duration.
-            // This stop might be ongoing. For coloring, we might not have a completed stop duration.
-            // Or, if your logging for a STOP event *does* include its own (potentially ongoing) stop duration in col 12, use that.
-            // Assuming col 12 for a STOP event is empty or refers to a previous stop for a START.
-            // For now, let's assume if it's a stop, and we don't have a *next* start, we can't determine its completed duration for coloring.
-        }
+        if (index + 1 < arr.length) { 
+          const nextEvent = arr[index + 1];
+          const nextEventType = nextEvent[3] ? nextEvent[3].trim().toUpperCase() : "";
+          if (nextEventType === "START") { durationForStopDecision = nextEvent[12] || "0:0"; } 
+          else { durationForStopDecision = e[12] || "0:0"; } 
+        } else { durationForStopDecision = e[12] || "0:0"; } 
       }
-      // Use config.longStopThresholdSec for comparison (fetch it or have it globally)
-      // Assuming longStopThresholdSec is available globally (e.g. fetched from /api/config)
-      const longStopThreshold = window.longStopThresholdSec || 300; // Default to 5 mins (300s)
-      if (eventType === "STOP" && mmssToSeconds(durationForStopDecision) >= longStopThreshold) return "#c62828"; // Darker red for long stops
-      if (eventType === "STOP") return "#ff9800"; // Orange for normal stops
-      return "#43a047"; // Green for starts
+      if (eventType === "STOP" && mmssToSeconds(durationForStopDecision) >= (window.longStopThresholdSec || 300) ) return "#c62828"; 
+      if (eventType === "STOP") return "#ff9800"; 
+      return "#43a047"; 
     });
 
     let pointSizes = filteredEventsGlobal.map((e, index, arr) => {
        const eventType = e[3] ? e[3].trim().toUpperCase() : "";
-       let durationForStopDecision = "0:00";
+       let durationForStopDecision = "0:0"; 
        if (eventType === "STOP") {
-        if (index + 1 < arr.length) {
-            const nextEvent = arr[index+1];
-            const nextEventType = nextEvent[3] ? nextEvent[3].trim().toUpperCase() : "";
-            if (nextEventType === "START") {
-                durationForStopDecision = nextEvent[12] || "0:00";
-            }
-        }
+         if (index + 1 < arr.length) {
+           const nextEvent = arr[index + 1];
+           const nextEventType = nextEvent[3] ? nextEvent[3].trim().toUpperCase() : "";
+           if (nextEventType === "START") { durationForStopDecision = nextEvent[12] || "0:0"; } 
+           else { durationForStopDecision = e[12] || "0:0"; }
+         } else { durationForStopDecision = e[12] || "0:0"; }
        }
-      const longStopThreshold = window.longStopThresholdSec || 300;
       let defaultSize = 7;
-      if (eventType === "STOP" && mmssToSeconds(durationForStopDecision) >= longStopThreshold) { defaultSize = 12; }
+      if (eventType === "STOP" && mmssToSeconds(durationForStopDecision) >= (window.longStopThresholdSec || 300)) { defaultSize = 12; }
       return defaultSize;
     });
 
@@ -1017,26 +965,24 @@ function renderEventChart() {
       label: 'Availability (%)', data: avail, yAxisID: 'y', stepped: true, tension: 0,
       pointRadius: pointSizes, pointBackgroundColor: pointColors, pointBorderColor: pointColors, showLine: true,
       segment: {
-        borderColor: ctx => {
-          // Use the state at the *beginning* of the segment (p0)
-          const stateValue = stateArr[ctx.p0DataIndex]; 
-          if (stateValue === "1") return "#43a047"; // Green for running
-          if (stateValue === "0") return "#c62828"; // Red for stopped
-          return "#000000"; // Black for unknown/default
+        borderColor: ctxSeg => { 
+          const stateValue = stateArr[ctxSeg.p0DataIndex];
+          if (stateValue === "1") return "#43a047"; if (stateValue === "0") return "#c62828"; 
+          return "#000000"; 
         },
         borderWidth: 3
       }
     }];
-    if (showMTBF) datasets.push({ label: 'MTBF (min)', data: mtbfValues, yAxisID: 'y1', borderColor: "#1565c0", borderWidth: 2, tension: 0.1, pointRadius: 4, fill:false });
-    if (showMTTR) datasets.push({ label: 'MTTR (min)', data: mttrValues, yAxisID: 'y1', borderColor: "#FF8F00", borderWidth: 2, tension: 0.1, pointRadius: 4, fill:false }); // Changed color for MTTR
+    if (showMTBF) datasets.push({ label: 'MTBF', data: mtbfValues, yAxisID: 'y1', borderColor: "#1565c0", borderWidth: 2, tension: 0, pointRadius: 4, fill: false }); 
+    if (showMTTR) datasets.push({ label: 'MTTR', data: mttrValues, yAxisID: 'y1', borderColor: "#FFD600", borderWidth: 2, tension: 0, pointRadius: 4, fill: false }); 
     
     if (eventChart) eventChart.destroy();
-    const ctx = document.getElementById('eventChart').getContext('2d');
-    eventChart = new Chart(ctx, {
+    const ctxRender = chartCanvas.getContext('2d'); 
+    eventChart = new Chart(ctxRender, {
       type: 'line', data: { labels: times, datasets: datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'nearest', axis: 'x', intersect: false }, // intersect false for easier tooltip hover
+        interaction: { mode: 'nearest', axis: 'x', intersect: true }, 
         layout: { padding: { top: 15 }},
         plugins: {
           tooltip: {
@@ -1050,7 +996,7 @@ function renderEventChart() {
               label: (tooltipItem) => {
                 const idx = tooltipItem.dataIndex;
                 const eventRow = filteredEventsGlobal[idx];
-                if (!eventRow) return null;
+                if(!eventRow) return null; 
                 const eventType = eventRow[3] ? eventRow[3].trim().toUpperCase() : "";
                 const datasetLabel = tooltipItem.dataset.label || '';
                 let lines = [];
@@ -1058,18 +1004,18 @@ function renderEventChart() {
                 if (datasetLabel === 'Availability (%)') {
                   const currentAvail = parseFloat(eventRow[5]).toFixed(2);
                   lines.push(`Availability: ${currentAvail}%`);
-                  if (eventType === "START") { // This is a START event
-                    const stopDurationSeconds = mmssToSeconds(eventRow[12] || "0:00"); // Stop duration that just ENDED
+                  if (eventType === "START") {
+                    const stopDurationSeconds = mmssToSeconds(eventRow[12] || "0:0"); 
                     if (stopDurationSeconds > 0) {
                          lines.push(`(Prior Stop: ${floatMinToMMSS(stopDurationSeconds / 60.0)})`);
                     }
-                  } else if (eventType === "STOP") { // This is a STOP event
-                    const runDurationSeconds = mmssToSeconds(eventRow[11] || "0:00"); // Run duration that just ENDED
+                  } else if (eventType === "STOP") {
+                    const runDurationSeconds = mmssToSeconds(eventRow[11] || "0:0"); 
                     if (runDurationSeconds > 0) {
                         lines.push(`(Prior Run: ${floatMinToMMSS(runDurationSeconds / 60.0)})`);
                     }
                   }
-                } else if (datasetLabel === 'MTBF (min)' || datasetLabel === 'MTTR (min)') {
+                } else if (datasetLabel === 'MTBF' || datasetLabel === 'MTTR') {
                   const currentValue = tooltipItem.raw; 
                   const formattedCurrentValue = floatMinToMMSS(currentValue);
                   lines.push(`${datasetLabel}: ${formattedCurrentValue}`);
@@ -1081,9 +1027,9 @@ function renderEventChart() {
                         if (Math.abs(change) > 1e-7) { 
                             const formattedChange = floatMinToMMSS(Math.abs(change));
                             let changeIndicator = "";
-                            if (datasetLabel === 'MTBF (min)') {
+                            if (datasetLabel === 'MTBF') {
                                 changeIndicator = change > 0 ? `(Increased by ${formattedChange} - Good)` : `(Decreased by ${formattedChange} - Bad)`;
-                            } else { // MTTR
+                            } else { 
                                 changeIndicator = change > 0 ? `(Increased by ${formattedChange} - Bad)` : `(Decreased by ${formattedChange} - Good)`;
                             }
                             lines.push(changeIndicator);
@@ -1094,14 +1040,14 @@ function renderEventChart() {
                   } else {
                     lines.push(`(Initial value)`);
                   }
-                  // Additional context for MTBF/MTTR based on the event type
-                  if (datasetLabel === 'MTBF (min)' && eventType === "STOP") { // MTBF is updated after a stop (i.e., a run has completed)
-                    const lastRunDurationSeconds = mmssToSeconds(eventRow[11] || "0:00");
+
+                  if (datasetLabel === 'MTBF' && eventType === "STOP") {
+                    const lastRunDurationSeconds = mmssToSeconds(eventRow[11] || "0:0"); 
                     if (lastRunDurationSeconds > 0) {
                       lines.push(`(Influenced by last run: ${floatMinToMMSS(lastRunDurationSeconds / 60.0)})`);
                     }
-                  } else if (datasetLabel === 'MTTR (min)' && eventType === "START") { // MTTR is updated after a start (i.e., a stop has completed)
-                    const lastStopDurationSeconds = mmssToSeconds(eventRow[12] || "0:00");
+                  } else if (datasetLabel === 'MTTR' && eventType === "START") {
+                    const lastStopDurationSeconds = mmssToSeconds(eventRow[12] || "0:0"); 
                     if (lastStopDurationSeconds > 0) {
                       lines.push(`(Influenced by last stop: ${floatMinToMMSS(lastStopDurationSeconds / 60.0)})`);
                     }
@@ -1114,22 +1060,30 @@ function renderEventChart() {
           legend: { position: 'top' }
         },
         scales: {
-          x: { title: { display: true, text: 'Time (HH:MM:SS Local)' } }, // Clarify local time
+          x: { title: { display: true, text: 'Time (HH:MM:SS)' } },
           y: { 
             title: { display: true, text: 'Availability (%)' }, 
             beginAtZero: true, 
-            suggestedMax: 105, // Allow a bit of space above 100
+            suggestedMax: 105, 
             ticks: {
-                stepSize: 20,    // Try to make ticks at 0, 20, 40, 60, 80, 100
+                stepSize: 20,    
                 callback: function(value, index, values) {
-                    if (value > 100 && value < 105) return undefined; // Hide ticks slightly above 100 unless it's the max
-                    if (value === 100 || value === 0 || (value > 0 && value < 100 && value % 20 === 0)) return value;
+                    if (value > 100 && value < 105 ) return undefined; 
+                    if (value === 100) return 100;
+                    if (value < 100 && value >= 0 && (value % (this.chart.options.scales.y.ticks.stepSize || 20) === 0) ) return value;
                     return undefined; 
                 }
             }
           }, 
-          // ...
-y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'MTBF/MTTR (min)' }, beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { callback: val => floatMinToMMSS(val) } // Ensure this is the full function name
+          y1: { 
+            type: 'linear', 
+            display: true, 
+            position: 'right', 
+            title: { display: true, text: 'MTBF/MTTR' }, 
+            beginAtZero: true, 
+            grid: { drawOnChartArea: false }, 
+            ticks: { callback: val => floatMinToMMSS(val) } 
+          }
         }
       }
     });
@@ -1138,35 +1092,28 @@ y1: { type: 'linear', display: true, position: 'right', title: { display: true, 
 function renderRecentEvents() {
   const tbody = document.getElementById('recentEvents'); if (!tbody) return; tbody.innerHTML = ""; 
   if (!allEvents || allEvents.length === 0) { tbody.innerHTML = "<tr><td colspan='13'>No event data for this asset.</td></tr>"; return; }
+  const eventsToDisplay = allEvents.slice(-10).reverse(); 
   
-  // Use filteredEventsGlobal if available and populated, otherwise fallback to allEvents for recent view
-  const eventsSource = (filteredEventsGlobal && filteredEventsGlobal.length > 0) ? filteredEventsGlobal : allEvents;
-  const eventsToDisplay = eventsSource.slice(-10).reverse(); // Last 10 events from the (potentially filtered) source
-  
-  if (eventsToDisplay.length === 0) { tbody.innerHTML = "<tr><td colspan='13'>No recent events for this asset or filter.</td></tr>"; return; }
+  if (eventsToDisplay.length === 0) { tbody.innerHTML = "<tr><td colspan='13'>No recent events for this asset.</td></tr>"; return; }
   
   eventsToDisplay.forEach(eventRow => {
     try {
       if (eventRow.length < 14) { 
           let tr = tbody.insertRow(); let td = tr.insertCell(); td.colSpan = 13; 
-          td.textContent = "Malformed data row."; td.style.color = "orange"; return; 
+          td.textContent = "Malformed data."; td.style.color = "orange"; return; 
       }
       let tr = tbody.insertRow();
-      tr.insertCell().textContent = eventRow[0];  // Date
-      tr.insertCell().textContent = eventRow[1];  // Time
-      tr.insertCell().textContent = eventRow[2];  // Asset Name
-      tr.insertCell().textContent = eventRow[3];  // Event Type (START/STOP)
-      tr.insertCell().textContent = parseFloat(eventRow[5]).toFixed(2); // Availability
-      tr.insertCell().textContent = floatMinToMMSS(eventRow[6]); // Total Runtime
-      tr.insertCell().textContent = floatMinToMMSS(eventRow[7]); // Total Downtime
-      tr.insertCell().textContent = floatMinToMMSS(eventRow[8]); // MTBF
-      tr.insertCell().textContent = floatMinToMMSS(eventRow[9]); // MTTR
-      tr.insertCell().textContent = eventRow[10]; // Stop Count
-      // Display Run Duration if event is STOP, Stop Duration if event is START
-      const eventType = eventRow[3] ? eventRow[3].trim().toUpperCase() : "";
-      tr.insertCell().textContent = eventType === "STOP" ? floatMinToMMSS(mmssToSeconds(eventRow[11] || "0:00") / 60.0) : ""; 
-      tr.insertCell().textContent = eventType === "START" ? floatMinToMMSS(mmssToSeconds(eventRow[12] || "0:00") / 60.0) : ""; 
-      tr.insertCell().textContent = eventRow[13] || ""; // Note
+      tr.insertCell().textContent = eventRow[0];  tr.insertCell().textContent = eventRow[1];  
+      tr.insertCell().textContent = eventRow[2];  tr.insertCell().textContent = eventRow[3];  
+      tr.insertCell().textContent = parseFloat(eventRow[5]).toFixed(2); 
+      tr.insertCell().textContent = floatMinToMMSS(eventRow[6]); 
+      tr.insertCell().textContent = floatMinToMMSS(eventRow[7]); 
+      tr.insertCell().textContent = floatMinToMMSS(eventRow[8]); 
+      tr.insertCell().textContent = floatMinToMMSS(eventRow[9]);
+      tr.insertCell().textContent = eventRow[10]; 
+      tr.insertCell().textContent = floatMinToMMSS(mmssToSeconds(eventRow[11] || "0:0") / 60.0); 
+      tr.insertCell().textContent = floatMinToMMSS(mmssToSeconds(eventRow[12] || "0:0") / 60.0); 
+      tr.insertCell().textContent = eventRow[13] || ""; 
     } catch (e) {
       console.error('Error rendering row for event:', eventRow, e);
       let tr = tbody.insertRow(); let td = tr.insertCell(); td.colSpan = 13; 
@@ -1175,19 +1122,17 @@ function renderRecentEvents() {
   });
 }
 
-// --- Initialisation ---
 function initAnalyticsPage() {
-    // Fetch longStopThreshold from config to use for coloring points
     fetch('/api/config')
-        .then(r => r.json())
+        .then(r => { if(!r.ok) throw new Error("Config fetch failed: " + r.status); return r.json();})
         .then(cfg => {
-            window.longStopThresholdSec = cfg.longStopThresholdSec || 300; // Store globally for chart rendering
-            fetchAnalyticsData(); // Now fetch event data
+            window.longStopThresholdSec = cfg.longStopThresholdSec || 300; 
+            fetchAnalyticsData(); 
         })
         .catch(e => {
             console.error("Failed to fetch config for longStopThreshold, using default.", e);
-            window.longStopThresholdSec = 300; // Default if config fetch fails
-            fetchAnalyticsData(); // Proceed to fetch event data
+            window.longStopThresholdSec = 300; 
+            fetchAnalyticsData(); 
         });
 }
 
@@ -1198,11 +1143,10 @@ if (document.readyState === 'loading') {
 }
 )rawliteral";
   html += "</script>";
-  html += "</div></body></html>";
+  html += "</div></body></html>"; 
   return html;
 }
 
-// --- htmlAnalyticsCompare() function ---
 String htmlAnalyticsCompare() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Compare Assets</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
@@ -1210,24 +1154,24 @@ String htmlAnalyticsCompare() {
   html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
   html += "<style>";
   html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}";
-  html += "header{background:#1976d2;color:#fff;padding:1.3rem 0;text-align:center;box-shadow:0 2px 10px #0001;font-size:1.6em;font-weight:700;}"; // Added font size/weight
+  html += "header{background:#1976d2;color:#fff;padding:1.3rem 0;text-align:center;box-shadow:0 2px 10px #0001; font-size:1.6em; font-weight:700;}"; 
   html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;}";
-  html += ".nav button, .nav a {text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;cursor:pointer;}"; // Combined button and <a>
-  html += ".nav button:hover, .nav a:hover {background:#e3f0fc;}"; // Combined hover
+  html += ".nav a, .nav button {text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;cursor:pointer;}";
+  html += ".nav a:hover, .nav button:hover {background:#e3f0fc;}";
   html += ".main{max-width:1100px;margin:1rem auto;padding:1rem;}";
   html += ".card{background:#fff;border-radius:10px;box-shadow:0 2px 16px #0002;margin-bottom:1.3rem;padding:1.3rem;}";
-  html += ".flexrow{display:flex;flex-wrap:wrap;gap:2em;justify-content:center;}"; // Added justify-content
-  html += ".chartcard{flex:1 1 320px;min-width:300px; max-width: calc(50% - 1em);}"; // Adjusted for 2 per row, added max-width
-  html += ".tablecard{overflow-x:auto; width:100%;}"; // Ensure table card takes full width
-  html += "th, td { text-align: left !important; padding: 0.5em;}"; 
-  html += "table {width:100%; border-collapse:collapse;} th{background:#e3f0fc; color:#1976d2;} tr:nth-child(even){background:#f8f9fa;}"; // Table styling
+  html += ".flexrow{display:flex;flex-wrap:wrap;gap:2em;justify-content:center;}"; 
+  html += ".chartcard{flex:1 1 320px;min-width:300px; max-width: calc(50% - 1em);}"; 
+  html += ".tablecard{overflow-x:auto;width:100%;}"; 
+  html += "th, td { text-align: left !important; padding:0.5em;}"; 
+  html += "table{width:100%; border-collapse:collapse;} th{background:#e3f0fc;color:#1976d2;} tr:nth-child(even){background:#f8f9fa;}";
   html += "@media(max-width:700px){.flexrow{flex-direction:column;gap:1em;}.chartcard{max-width:100%;}.card{padding:0.7em;}}";
   html += "</style></head><body>";
-  html += "<header>Compare Assets</header>";
+  html += "<header>Compare Assets</header>"; 
   html += "<nav class='nav'>";
-  html += "<a href='/'>Dashboard</a>"; // Changed to <a>
-  html += "<a href='/events'>Event Log</a>"; // Changed to <a>
-  html += "<a href='/export_log'>Export CSV</a>"; // Changed to <a>
+  html += "<a href='/'>Dashboard</a>"; 
+  html += "<a href='/events'>Event Log</a>";
+  html += "<a href='/export_log'>Export CSV</a>"; 
   html += "</nav>";
   html += "<div class='main'>";
   html += "<div class='flexrow'>";
@@ -1237,7 +1181,7 @@ String htmlAnalyticsCompare() {
   html += "<div class='card chartcard'><canvas id='pieReasons'></canvas></div>";
   html += "</div>";
   html += "<div class='card tablecard'>";
-  html += "<h3>Last Event Log Summary</h3><table style='width:100%;'><thead><tr>" // Clarified table title
+  html += "<h3>Last Event Log Summary</h3><table style='width:100%;'><thead><tr>" 
           "<th>Asset</th>"
           "<th>Availability (%)</th>"
           "<th>Runtime</th>"
@@ -1248,207 +1192,216 @@ String htmlAnalyticsCompare() {
           "</tr></thead><tbody id='compareTable'></tbody></table></div>";
   html += "<script>";
   html += R"rawliteral(
-let allEvents = [], allAssetNames = [], configDowntimeReasons = []; // Renamed to avoid conflict
+let allEventsCompare = [], allAssetNamesCompare = [], configDowntimeReasonsCompare = []; 
 
-function formatMinutesToHHMMSS(val) { // Renamed for clarity
-  if (isNaN(val) || val <= 0) return "0:00:00";
+function formatMinutesToHHMMSSCompare(val) { 
+  if (isNaN(val) || val <= 0.001) return "0:00:00"; 
   let totalSeconds = Math.round(val * 60);
   let h = Math.floor(totalSeconds / 3600);
   let m = Math.floor((totalSeconds % 3600) / 60);
   let s = totalSeconds % 60;
-  return h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  return h.toString().padStart(1, '0') + ":" + m.toString().padStart(2, '0') + ":" + s.toString().padStart(2, '0'); 
 }
 
-function fetchCompareData() { // Renamed
+function fetchCompareDataPage() { 
   fetch('/api/config').then(r=>r.json()).then(cfg=>{
-    configDowntimeReasons = cfg.downtimeReasons || [];
-    allAssetNames = cfg.assets.map(a=>a.name); // Get names from config
+    configDowntimeReasonsCompare = cfg.downtimeReasons||[];
+    allAssetNamesCompare = cfg.assets.map(a=>a.name);
     
     fetch('/api/events').then(r=>r.json()).then(events=>{
-      allEvents = events
-        .map(l => (typeof l === 'string' ? l.split(',') : [])) // Ensure splitting
-        .filter(v => v.length > 13 && allAssetNames.includes(v[2])); // Filter by known asset names
-      
-      renderCompareCharts();
-      renderCompareTable();
-    }).catch(e => console.error("Error fetching events for compare:", e));
-  }).catch(e => console.error("Error fetching config for compare:", e));
+      allEventsCompare = events
+        .map(l=> (typeof l === 'string' ? l.split(',') : []) ) 
+        .filter(v=>v.length>13 && allAssetNamesCompare.includes(v[2]));
+      renderCompareChartsPage();
+      renderCompareTablePage();
+    }).catch(e=>console.error("CompareEventsFetchErr:", e));
+  }).catch(e=>console.error("CompareConfigFetchErr:", e));
 }
 
-function getLastValidMetric(events, metricIndex, defaultValue = 0) { // Renamed and added default
-  if (!events || events.length === 0) return defaultValue;
-  const lastEvent = events[events.length - 1];
-  if (lastEvent && lastEvent.length > metricIndex) {
-    const metric = parseFloat(lastEvent[metricIndex]);
-    return isNaN(metric) ? defaultValue : metric;
+function getLastMetricCompare(events, idx) { 
+  return events && events.length ? parseFloat(events[events.length-1][idx]) : 0; 
+}
+
+function renderCompareChartsPage() { 
+  let byAsset = {};
+  allAssetNamesCompare.forEach(a=>{byAsset[a]=[];});
+  for (let e of allEventsCompare) { if(byAsset[e[2]]) byAsset[e[2]].push(e); } 
+  
+  let labels = allAssetNamesCompare;
+  let avail = labels.map(a=>getLastMetricCompare(byAsset[a]||[],5)); 
+  let stops = labels.map(a=>(byAsset[a]||[]).filter(e=>e[3] && e[3].toUpperCase()==="STOP").length); 
+  let mtbf = labels.map(a=>getLastMetricCompare(byAsset[a]||[],8));
+  
+  let reasons = {};
+  configDowntimeReasonsCompare.forEach(r => reasons[r] = 0); 
+
+  for (let e of allEventsCompare) {
+    if (e.length < 14) continue; 
+    let note = e[13]||"";
+    let res = "";
+    if (note.indexOf(" - ")>-1) res = note.split(" - ")[0].trim();
+    else res = note.trim();
+    if (res && configDowntimeReasonsCompare.includes(res)) reasons[res] = (reasons[res]||0)+1;
   }
-  return defaultValue;
-}
+  
+  const pieLabels = Object.keys(reasons).filter(r => reasons[r] > 0);
+  const pieData = pieLabels.map(r => reasons[r]);
+  const pieColors = ['#ffa726','#ef5350','#66bb6a','#42a5f5','#ab47bc', '#FFEE58', '#26A69A', '#78909C'];
 
-function renderCompareCharts() {
-  let dataByAsset = {};
-  allAssetNames.forEach(assetName => { dataByAsset[assetName] = []; });
-  allEvents.forEach(eventRow => {
-    if (eventRow[2] && dataByAsset[eventRow[2]]) { // Check if asset name exists in map
-        dataByAsset[eventRow[2]].push(eventRow);
-    }
+
+  ['barAvail', 'barStops', 'barMTBF', 'pieReasons'].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (canvas && canvas.chartInstance) canvas.chartInstance.destroy(); 
   });
 
-  let labels = allAssetNames;
-  let availabilityData = labels.map(name => getLastValidMetric(dataByAsset[name], 5));
-  let stopsData = labels.map(name => (dataByAsset[name] || []).filter(e => e[3] === "STOP").length);
-  let mtbfData = labels.map(name => getLastValidMetric(dataByAsset[name], 8));
-  
-  let reasonCounts = {};
-  configDowntimeReasons.forEach(r => reasonCounts[r] = 0); // Initialize all configured reasons
-
-  allEvents.forEach(eventRow => {
-    if (eventRow[3] === "START" && eventRow.length > 13) { // Look at START events for preceding stop reason
-        let noteFromEvent = eventRow[13] || "";
-        let reasonPart = "";
-        if (noteFromEvent.includes(" - ")) {
-            reasonPart = noteFromEvent.split(" - ")[0].trim();
-        } else {
-            reasonPart = noteFromEvent.trim();
-        }
-        if (reasonPart && configDowntimeReasons.includes(reasonPart)) {
-            reasonCounts[reasonPart] = (reasonCounts[reasonPart] || 0) + 1;
-        }
-    }
-  });
-  
-  const pieLabels = Object.keys(reasonCounts).filter(r => reasonCounts[r] > 0); // Only show reasons with counts
-  const pieData = pieLabels.map(r => reasonCounts[r]);
-  const pieColors = ['#ffa726','#ef5350','#66bb6a','#42a5f5','#ab47bc', '#FFEE58', '#26A69A', '#78909C']; // Added more colors
-
-  if(document.getElementById('barAvail').chart) document.getElementById('barAvail').chart.destroy();
-  document.getElementById('barAvail').chart = new Chart(document.getElementById('barAvail').getContext('2d'), {
-    type:'bar',data:{labels:labels,datasets:[{label:'Availability (%)',data:availabilityData,backgroundColor:'#42a5f5'}]},
-    options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100}}}
-  });
-  
-  if(document.getElementById('barStops').chart) document.getElementById('barStops').chart.destroy();
-  document.getElementById('barStops').chart = new Chart(document.getElementById('barStops').getContext('2d'), {
-    type:'bar',data:{labels:labels,datasets:[{label:'Stops',data:stopsData,backgroundColor:'#ef5350'}]},
-    options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}} // Ensure integer ticks for stops
-  });
-  
-  if(document.getElementById('barMTBF').chart) document.getElementById('barMTBF').chart.destroy();
-  document.getElementById('barMTBF').chart = new Chart(document.getElementById('barMTBF').getContext('2d'), {
-    type:'bar',data:{labels:labels,datasets:[{label:'MTBF (min)',data:mtbfData,backgroundColor:'#66bb6a'}]},
-    options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}}
-  });
-  
-  if(document.getElementById('pieReasons').chart) document.getElementById('pieReasons').chart.destroy();
-  if (pieLabels.length > 0) { // Only render pie chart if there's data
-    document.getElementById('pieReasons').chart = new Chart(document.getElementById('pieReasons').getContext('2d'), {
-      type:'pie',data:{
-        labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors.slice(0, pieLabels.length)}]
-      },options:{responsive:true,maintainAspectRatio:false, plugins:{legend:{position:'right'}}} // Legend on the right
+  if (document.getElementById('barAvail')) {
+    document.getElementById('barAvail').chartInstance = new Chart(document.getElementById('barAvail').getContext('2d'), {
+      type:'bar',data:{labels:labels,datasets:[{label:'Availability (%)',data:avail,backgroundColor:'#42a5f5'}]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100, title:{display:true, text:'Availability (%)'}}}} 
     });
-  } else {
-    const ctxPie = document.getElementById('pieReasons').getContext('2d');
-    ctxPie.clearRect(0,0,ctxPie.canvas.width, ctxPie.canvas.height);
-    ctxPie.textAlign = 'center'; ctxPie.fillText('No downtime reasons logged.', ctxPie.canvas.width/2, ctxPie.canvas.height/2);
+  }
+  if (document.getElementById('barStops')) {
+    document.getElementById('barStops').chartInstance = new Chart(document.getElementById('barStops').getContext('2d'), {
+      type:'bar',data:{labels:labels,datasets:[{label:'Stops',data:stops,backgroundColor:'#ef5350'}]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true, ticks:{stepSize:1}, title:{display:true, text:'Number of Stops'}}}} 
+    });
+  }
+  if (document.getElementById('barMTBF')) {
+    document.getElementById('barMTBF').chartInstance = new Chart(document.getElementById('barMTBF').getContext('2d'), {
+      type:'bar',data:{labels:labels,datasets:[{label:'MTBF (min)',data:mtbf,backgroundColor:'#66bb6a'}]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true, title:{display:true, text:'MTBF (minutes)' }}}} 
+    });
+  }
+  
+  const pieCanvas = document.getElementById('pieReasons');
+  if (pieCanvas) {
+    if (pieLabels.length > 0) {
+      pieCanvas.chartInstance = new Chart(pieCanvas.getContext('2d'), {
+        type:'pie',data:{
+          labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors.slice(0, pieLabels.length)}]
+        },options:{responsive:true,maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{boxWidth:15}}, title:{display:true, text:'Downtime Reasons'}}} 
+      });
+    } else {
+      const ctx = pieCanvas.getContext('2d');
+      ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height);
+      ctx.textAlign = 'center'; ctx.font = '14px Roboto'; ctx.fillStyle = '#555'; 
+      ctx.fillText('No downtime reasons logged.', ctx.canvas.width/2, ctx.canvas.height/2);
+    }
   }
 }
 
-function renderCompareTable() {
-  let tbody = document.getElementById('compareTable'); // Corrected ID
-  tbody.innerHTML = ""; // Clear previous table data
-  
-  let dataByAsset = {};
-  allAssetNames.forEach(assetName => { dataByAsset[assetName] = []; });
-  allEvents.forEach(eventRow => {
-    if (eventRow[2] && dataByAsset[eventRow[2]]) {
-        dataByAsset[eventRow[2]].push(eventRow);
-    }
-  });
+function renderCompareTablePage() { 
+  let tb = document.getElementById('compareTable');
+  if(!tb) return; 
+  tb.innerHTML = "";
+  let byAsset = {};
+  allAssetNamesCompare.forEach(a=>{byAsset[a]=[];});
+  for (let e of allEventsCompare) { if(byAsset[e[2]]) byAsset[e[2]].push(e); }
 
-  allAssetNames.forEach(assetName => {
-    let assetEvents = dataByAsset[assetName] || [];
-    let lastEvent = assetEvents.length ? assetEvents[assetEvents.length - 1] : null;
-    
-    let tr = tbody.insertRow();
-    tr.insertCell().textContent = assetName;
-    tr.insertCell().textContent = lastEvent ? parseFloat(lastEvent[5]).toFixed(2) : "-";
-    tr.insertCell().textContent = lastEvent ? formatMinutesToHHMMSS(parseFloat(lastEvent[6])) : "-";
-    tr.insertCell().textContent = lastEvent ? formatMinutesToHHMMSS(parseFloat(lastEvent[7])) : "-";
-    tr.insertCell().textContent = assetEvents.filter(e => e[3] === "STOP").length;
-    tr.insertCell().textContent = lastEvent ? formatMinutesToHHMMSS(parseFloat(lastEvent[8])) : "-";
-    tr.insertCell().textContent = lastEvent ? formatMinutesToHHMMSS(parseFloat(lastEvent[9])) : "-";
-  });
+  for (let a of allAssetNamesCompare) {
+    let evs = byAsset[a]||[], e_last = evs.length?evs[evs.length-1]:null; 
+    tb.innerHTML += `<tr>
+      <td>${a}</td>
+      <td>${e_last && e_last[5] ?parseFloat(e_last[5]).toFixed(2):"-"}</td>
+      <td>${e_last && e_last[6] ?formatMinutesToHHMMSSCompare(parseFloat(e_last[6])):"-"}</td>
+      <td>${e_last && e_last[7] ?formatMinutesToHHMMSSCompare(parseFloat(e_last[7])):"-"}</td>
+      <td>${evs.filter(ev=>ev[3] && ev[3].toUpperCase()==="STOP").length}</td>
+      <td>${e_last && e_last[8] ?formatMinutesToHHMMSSCompare(parseFloat(e_last[8])):"-"}</td>
+      <td>${e_last && e_last[9] ?formatMinutesToHHMMSSCompare(parseFloat(e_last[9])):"-"}</td>
+    </tr>`;
+  }
 }
-
-fetchCompareData(); // Initial fetch
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', fetchCompareDataPage); }
+else { fetchCompareDataPage(); }
 )rawliteral";
   html += "</script>";
   html += "</div></body></html>";
   return html;
 }
 
-// --- htmlEvents() function ---
-String htmlEvents() {
-  String html = "<!DOCTYPE html><html lang='en'><head><title>Event Log</title>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<style>";
-  html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001;font-size:1.6em;font-weight:700;}"; // Style header
-  html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0 0 0;flex-wrap:wrap;align-items:center;}"; // Added align-items
-  html += ".nav button, .nav a {text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;transition:.2s;cursor:pointer;margin-bottom:0.5em;}"; // Combined button and <a>
-  html += ".nav button:hover, .nav a:hover {background:#e3f0fc;}"; // Combined hover
-  html += ".main{max-width:1100px;margin:1rem auto;padding:1rem;}";
-  html += ".card{background:#fff;border-radius:10px;box-shadow:0 2px 16px #0002;margin-bottom:1.3rem;padding:1.3rem;}";
-  html += ".filterrow{display:flex;gap:1em;align-items:center;margin-bottom:1em;flex-wrap:wrap;}";
-  html += ".filterrow label{font-weight:bold; margin-right:0.3em;} .filterrow select, .filterrow input {padding:0.5em; border-radius:4px; border:1px solid #ccc; margin-right:1em;}"; // Style filters
-  html += ".scrollToggle{margin-left:auto;font-size:1em; padding: 0.5em 0.8em; border-radius:4px; background-color:#6c757d; color:white; border:none; cursor:pointer;} .scrollToggle:hover{background-color:#5a6268;}"; // Style toggle button
-  html += "table{width:100%;border-collapse:collapse;font-size:1em;margin-top:0.8em;}";
-  html += "th,td{padding:0.7em 0.5em;text-align:left;border-bottom:1px solid #eee;}";
-  html += "th{background:#2196f3;color:#fff;}";
-  html += "tr{background:#fcfcfd;} tr:nth-child(even){background:#f3f7fa;}";
-  html += ".note{font-style:italic;color:#555;white-space:normal;word-break:break-word;display:block;max-width:260px;}";
-  html += ".notebtn{padding:2px 8px;font-size:1em;border-radius:4px;background:#1976d2;color:#fff;border:none;cursor:pointer;margin-left:0.5em;} .notebtn:hover{background:#0d47a1;}";
-  html += ".noteform{display:flex;flex-direction:column;background:#e3f0fc;padding:0.7em;margin:0.5em 0 0.5em 0;border-radius:8px;width:100%;box-sizing:border-box;}";
-  html += ".noteform label{margin-bottom:0.3em;}";
-  html += ".noteform select,.noteform input[type=\"text\"]{width:100%;margin-bottom:0.4em;font-size:1em;padding:0.2em 0.5em;box-sizing:border-box; border-radius:4px; border:1px solid #ccc;}"; // Added border
-  html += ".noteform button{margin-top:0.1em;margin-right:0.3em;width:auto;align-self:flex-start; padding:0.4em 0.8em; border-radius:4px;}"; // Added padding & radius
-  html += "td:last-child{max-width:280px;overflow-wrap:anywhere;word-break:break-word;}";
-  html += "@media (max-width:700px){";
-  html += "  #eventTable{display:none;}"; // Hide table on mobile
-  html += "  .eventCard {background: #fff;border-radius: 10px;box-shadow: 0 2px 10px #0001;margin-bottom: 1.2em;padding: 1em;font-size: 1.05em;}";
-  html += "  .eventCard div {margin-bottom: 0.3em;}";
-  html += "  #mobileEvents {max-height:70vh;overflow-y:auto;}"; // Make mobile scrollable
-  html += "  .filterrow {flex-direction:column; align-items:stretch;} .filterrow label, .filterrow select, .filterrow input {width:100%; margin-bottom:0.5em;} .scrollToggle{margin-left:0; width:100%; text-align:center;}"; // Stack filters on mobile
-  html += "}";
-  html += "@media (min-width:701px){";
-  html += "  #mobileEvents{display:none;}"; // Hide mobile cards on desktop
-  html += "}";
-  html += "</style>";
-  html += "<script>";
-  html += R"rawliteral(
-// Track currently open note form between refreshes:
+// CHUNKED SENDING FUNCTION FOR EVENT LOG PAGE
+void sendHtmlEventsPage() {
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/html", ""); // Send headers
+
+  server.sendContent("<!DOCTYPE html><html lang='en'><head><title>Event Log</title>");
+  server.sendContent("<meta name='viewport' content='width=device-width,initial-scale=1'>");
+  server.sendContent("<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>");
+  server.sendContent("<style>");
+  server.sendContent("body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001; font-size:1.6em; font-weight:700;}");
+  server.sendContent(".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0 0 0;flex-wrap:wrap;}");
+  server.sendContent(".nav button, .nav a {text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;transition:.2s;cursor:pointer;margin-bottom:0.5em;}"); 
+  server.sendContent(".nav button:hover, .nav a:hover {background:#e3f0fc;}"); 
+  server.sendContent(".main{max-width:1100px;margin:1rem auto;padding:1rem;}");
+  server.sendContent(".card{background:#fff;border-radius:10px;box-shadow:0 2px 16px #0002;margin-bottom:1.3rem;padding:1.3rem;}");
+  server.sendContent(".filterrow{display:flex;gap:1em;align-items:center;margin-bottom:1em;flex-wrap:wrap;}");
+  server.sendContent(".filterrow label{font-weight:bold; margin-right:0.3em;} .filterrow select, .filterrow input {padding:0.5em; border-radius:4px; border:1px solid #ccc; margin-right:1em;}"); 
+  server.sendContent(".scrollToggle{margin-left:auto;font-size:1em; padding: 0.5em 0.8em; border-radius:4px; background-color:#6c757d; color:white; border:none; cursor:pointer;} .scrollToggle:hover{background-color:#5a6268;}"); 
+  server.sendContent("table{width:100%;border-collapse:collapse;font-size:1em;margin-top:0.8em;}");
+  server.sendContent("th,td{padding:0.7em 0.5em;text-align:left;border-bottom:1px solid #eee;}");
+  server.sendContent("th{background:#2196f3;color:#fff;}");
+  server.sendContent("tr{background:#fcfcfd;} tr:nth-child(even){background:#f3f7fa;}");
+  server.sendContent(".note{font-style:italic;color:#555;white-space:normal;word-break:break-word;display:block;max-width:260px;}");
+  server.sendContent(".notebtn{padding:2px 8px;font-size:1em;border-radius:4px;background:#1976d2;color:#fff;border:none;cursor:pointer;margin-left:0.5em;} .notebtn:hover{background:#0d47a1;}");
+  server.sendContent(".noteform{display:flex;flex-direction:column;background:#e3f0fc;padding:0.7em;margin:0.5em 0 0.5em 0;border-radius:8px;width:100%;box-sizing:border-box;}");
+  server.sendContent(".noteform label{margin-bottom:0.3em;}");
+  server.sendContent(".noteform select,.noteform input[type=\"text\"]{width:100%;margin-bottom:0.4em;font-size:1em;padding:0.2em 0.5em;box-sizing:border-box; border-radius:4px; border:1px solid #ccc;}"); 
+  server.sendContent(".noteform button{margin-top:0.1em;margin-right:0.3em;width:auto;align-self:flex-start; padding:0.4em 0.8em; border-radius:4px;}"); 
+  server.sendContent("td:last-child{max-width:280px;overflow-wrap:anywhere;word-break:break-word;}"); 
+  server.sendContent("@media (max-width:700px){");
+  server.sendContent("  #eventTable{display:none;}");
+  server.sendContent("  .eventCard {background: #fff;border-radius: 10px;box-shadow: 0 2px 10px #0001;margin-bottom: 1.2em;padding: 1em;font-size: 1.05em;}");
+  server.sendContent("  .eventCard div {margin-bottom: 0.3em;}");
+  server.sendContent("  #mobileEvents {max-height:70vh;overflow-y:auto;}"); 
+  server.sendContent("  .filterrow {flex-direction:column; align-items:stretch;} .filterrow label, .filterrow select, .filterrow input {width:100%; margin-bottom:0.5em;} .scrollToggle{margin-left:0; width:100%; text-align:center;}"); 
+  server.sendContent("}");
+  server.sendContent("@media (min-width:701px){");
+  server.sendContent("  #mobileEvents{display:none;}"); 
+  server.sendContent("}");
+  server.sendContent("</style>");
+  server.sendContent("<script>");
+  server.sendContent(R"rawliteral(
 window.openNoteFormId = null;
 window.refreshIntervalId = null;
-let eventData = []; // Holds all fetched events
-let channelList = []; // Holds asset names for filter dropdown
-let filterValue = "ALL"; // Current asset filter
-let stateFilter = "ALL"; // Current state filter (RUNNING/STOPPED/ALL)
-window.downtimeReasons = []; // Loaded from /api/config
-let scrollInhibit = false; // To control auto-scrolling
+let eventData = []; 
+let channelList = []; 
+let filterValue = "ALL"; 
+let stateFilter = "ALL"; 
+window.downtimeReasons = []; 
+let scrollInhibit = false; 
 
 function startAutoRefresh() {
   if (window.refreshIntervalId) clearInterval(window.refreshIntervalId);
-  window.refreshIntervalId = setInterval(fetchAndRenderEvents, 5000); // Refresh every 5 seconds
+  window.refreshIntervalId = setInterval(fetchAndRenderEvents, 5000); 
 }
 function stopAutoRefresh() {
   if (window.refreshIntervalId) clearInterval(window.refreshIntervalId);
   window.refreshIntervalId = null;
 }
-function fetchChannelsAndStart() { // Fetches asset names for the filter dropdown
+
+function initializeEventPage() {
+  console.log("DOMContentLoaded event fired. Initializing event page...");
+  let testSel = document.getElementById('channelFilter');
+  if (!testSel) {
+    console.error("!!! TEST FAIL: 'channelFilter' is NULL immediately after DOMContentLoaded.");
+    const mainCard = document.querySelector(".main.card"); 
+    if(mainCard) mainCard.innerHTML = "<h1 style='color:red;'>CRITICAL DOM ERROR: 'channelFilter' element not found. Page cannot load.</h1>";
+    else document.body.innerHTML = "<h1 style='color:red;'>CRITICAL DOM ERROR: 'channelFilter' element not found. Page cannot load.</h1>";
+  } else {
+    console.log("+++ TEST PASS: 'channelFilter' was found after DOMContentLoaded. Proceeding to fetchChannelsAndStart.");
+    fetchChannelsAndStart(); 
+  }
+}
+
+function fetchChannelsAndStart() { 
   fetch('/api/summary').then(r=>r.json()).then(data=>{
     channelList = data.assets.map(a=>a.name);
     let sel = document.getElementById('channelFilter');
-    sel.innerHTML = "<option value='ALL'>All Assets</option>"; // Default option
+    if (!sel) { 
+      console.error("CRITICAL: 'channelFilter' still null in fetchChannelsAndStart. This shouldn't happen if initializeEventPage worked.");
+      return; 
+    }
+    sel.innerHTML = "<option value='ALL'>All Assets</option>"; 
     for (let i=0;i<channelList.length;++i) {
       let opt = document.createElement("option");
       opt.value = channelList[i];
@@ -1456,92 +1409,102 @@ function fetchChannelsAndStart() { // Fetches asset names for the filter dropdow
       sel.appendChild(opt);
     }
     sel.onchange = function() { filterValue = sel.value; renderTable(); };
-    document.getElementById('stateFilter').onchange = function() { stateFilter = this.value; renderTable(); };
-    fetchReasonsAndEvents(); // After channels, fetch reasons then events
-  }).catch(e => console.error("Error fetching channels:", e));
+    
+    let stateSel = document.getElementById('stateFilter');
+    if (!stateSel) {
+      console.error("CRITICAL: HTML element with ID 'stateFilter' not found.");
+      return;
+    }
+    stateSel.onchange = function() { stateFilter = this.value; renderTable(); };
+    
+    fetchReasonsAndEvents(); 
+  }).catch(e => {
+      console.error("Error fetching channels or setting up filters:", e); 
+      const mainCard = document.querySelector(".main.card");
+      if(mainCard) {
+          mainCard.innerHTML = "<p style='color:red; font-weight:bold;'>Error loading event log: Could not fetch initial filter data. Please check console.</p>" + (e.message ? `<p>${e.message}</p>` : "");
+      }
+  });
 }
-function fetchReasonsAndEvents() { // Fetches downtime reasons then event data
+function fetchReasonsAndEvents() { 
   fetch('/api/config').then(r=>r.json()).then(cfg=>{
     window.downtimeReasons = cfg.downtimeReasons || [];
-    fetchAndRenderEvents(); // Initial fetch of events
-    startAutoRefresh(); // Start auto-refreshing events
-  }).catch(e => console.error("Error fetching config for reasons:", e));
+    fetchAndRenderEvents(); 
+    startAutoRefresh(); 
+  }).catch(e => {
+      console.error("Error fetching config for reasons:", e);
+  });
 }
-function fetchAndRenderEvents() { // Fetches event log data
+function fetchAndRenderEvents() { 
   fetch('/api/events').then(r=>r.json()).then(events=>{
-    eventData = events; // Store raw event lines
-    renderTable(); // Render the table with new data
-  }).catch(e => console.error("Error fetching events:", e));
+    eventData = events; 
+    renderTable(); 
+  }).catch(e => {
+      console.error("Error fetching events:", e);
+      const mainCardTbody = document.getElementById('tbody');
+      if(mainCardTbody) mainCardTbody.innerHTML = "<tr><td colspan='14' style='color:red;text-align:center;'>Failed to load events.</td></tr>";
+      const mobileEventsDiv = document.getElementById('mobileEvents');
+      if(mobileEventsDiv) mobileEventsDiv.innerHTML = "<p style='color:red;text-align:center;'>Failed to load events.</p>";
+  });
 }
-function cleanNote(val) { // Helper to clean up note string for display
+function cleanNote(val) { 
   if (!val) return "";
   let v = val.trim();
-  // Remove common empty/default values that might come from CSV parsing if note was empty
   if (v === "" || v === "," || v === ",," || v === "0,0," || v === "0.00,0,") return "";
-  return v.replace(/^,+|,+$/g, ""); // Remove leading/trailing commas
+  return v.replace(/^,+|,+$/g, ""); 
 }
-
-// Format minutes (float) as hh:mm:ss
-function minToHHMMSS(valStr) {
-  let val = parseFloat(valStr); // Ensure it's a number
-  if (isNaN(val) || val <= 0.001) return "00:00:00"; // Handle very small or zero values
+function minToHHMMSS(valStr) { 
+  let val = parseFloat(valStr); 
+  if (isNaN(val) || val <= 0.001) return "00:00:00"; 
   let totalSeconds = Math.round(val * 60);
   let h = Math.floor(totalSeconds / 3600);
-  let m = Math.floor((totalSeconds % 3600) / 60); // Corrected to ensure minutes are 0-59
+  let m = Math.floor((totalSeconds % 3600) / 60); 
   let s = totalSeconds % 60;
   return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
 }
-
-// Format mm:ss or h:mm:ss from mm:ss or h:mm:ss string (for Run/Stop Duration)
 function durationStrToHHMMSS(str) {
-  if (!str || typeof str !== "string" || str.trim() === "") return ""; // Return empty if no duration
+  if (!str || typeof str !== "string" || str.trim() === "") return ""; 
   let parts = str.split(":").map(Number);
   let h=0, m=0, s=0;
-  if (parts.length === 3) { // h:mm:ss
+  if (parts.length === 3) { 
     [h, m, s] = parts;
-  } else if (parts.length === 2) { // mm:ss
+  } else if (parts.length === 2) { 
     [m, s] = parts;
-    h = Math.floor(m / 60);
+    h = Math.floor(m / 60); 
     m = m % 60;
   } else {
-    return ""; // Invalid format
+    return ""; 
   }
-  if (isNaN(h) || isNaN(m) || isNaN(s)) return ""; // Invalid numbers
+  if (isNaN(h) || isNaN(m) || isNaN(s)) return ""; 
   return (h < 10 ? "0":"") + h + ":" + (m < 10 ? "0":"") + m + ":" + (s < 10 ? "0":"") + s;
 }
-
 function renderTable() {
   let tbody = document.getElementById('tbody');
   let mobileDiv = document.getElementById('mobileEvents');
-  tbody.innerHTML = ''; // Clear desktop table
-  mobileDiv.innerHTML = ''; // Clear mobile cards
+  if(!tbody || !mobileDiv) { console.error("Table body or mobile div not found in renderTable"); return; }
 
-  let stateMatcher = function(eventStateVal) { // Corrected function name
+  tbody.innerHTML = ''; 
+  mobileDiv.innerHTML = ''; 
+  let stateMatcher = function(eventStateVal) { 
     if (stateFilter === "ALL") return true;
     if (stateFilter === "RUNNING") return eventStateVal === "1";
     if (stateFilter === "STOPPED") return eventStateVal === "0";
-    return true; // Default if filter is unexpected
+    return true; 
   };
-
   let isMobile = window.innerWidth <= 700;
-  let displayData = eventData.slice().reverse(); // Show newest first
-
+  let displayData = eventData.slice().reverse(); 
   for (let i=0; i<displayData.length; ++i) {
     let csvLine = displayData[i];
-    if (typeof csvLine !== 'string') continue; // Skip if not a string
+    if (typeof csvLine !== 'string') continue; 
     let vals = csvLine.split(',');
-    if (vals.length < 14) continue; // Expect at least 14 columns based on logEvent format
-
+    if (vals.length < 14) continue; 
     let ldate = vals[0], ltime = vals[1], lasset = vals[2], levent = vals[3], lstateVal = vals[4];
     let lavail = vals[5], lrun = vals[6], lstop = vals[7], lmtbf = vals[8], lmttr = vals[9], lsc = vals[10];
     let runDurStr = vals[11], stopDurStr = vals[12];
-    let lnote = vals.slice(13).join(',').replace(/\n$/, ""); // Join remaining parts for note, remove trailing newline
-
+    let lnote = vals.slice(13).join(',').replace(/\n$/, ""); 
     let stopsInt = Math.round(Number(lsc));
-
     if (filterValue !== "ALL" && lasset !== filterValue) continue;
-    if (!stateMatcher(lstateVal)) continue; // Use corrected stateMatcher
-
+    if (!stateMatcher(lstateVal)) continue; 
     let noteFormId = 'noteform-' + btoa(ldate + "|" + ltime + "|" + lasset).replace(/[^a-zA-Z0-9]/g, "_");
     let noteFormHtml = `
       <form class='noteform' id='${noteFormId}' onsubmit='return submitNote(event,"${ldate}","${ltime}","${lasset}")' style='display:none;'>
@@ -1558,35 +1521,29 @@ function renderTable() {
         <input type='hidden' name='asset' value='${lasset}'>
       </form>
     `;
-
     if (!isMobile) {
       let tr = document.createElement('tr');
-      function td(txt) { let tdEl=document.createElement('td'); tdEl.innerHTML=txt; return tdEl; } // Corrected 'td' var name
+      function td(txt) { let tdEl=document.createElement('td'); tdEl.innerHTML=txt; return tdEl; } 
       tr.appendChild(td(ldate));
       tr.appendChild(td(ltime));
       tr.appendChild(td(lasset));
-      tr.appendChild(td(levent)); // START or STOP
+      tr.appendChild(td(levent)); 
       tr.appendChild(td(lstateVal=="1" ? "<span style='color:#256029;font-weight:bold;'>RUNNING</span>" : "<span style='color:#b71c1c;font-weight:bold;'>STOPPED</span>"));
       tr.appendChild(td(Number(lavail).toFixed(2)));
-      tr.appendChild(td(minToHHMMSS(lrun))); // Use minToHHMMSS for consistency
+      tr.appendChild(td(minToHHMMSS(lrun))); 
       tr.appendChild(td(minToHHMMSS(lstop)));
       tr.appendChild(td(minToHHMMSS(lmtbf)));
       tr.appendChild(td(minToHHMMSS(lmttr)));
-      tr.appendChild(td(String(stopsInt))); // Ensure it's a string
-      tr.appendChild(td(levent.toUpperCase()==="STOP" ? durationStrToHHMMSS(runDurStr) : "")); // Show RunDur for STOP events
-      tr.appendChild(td(levent.toUpperCase()==="START" ? durationStrToHHMMSS(stopDurStr) : ""));// Show StopDur for START events
-      
+      tr.appendChild(td(String(stopsInt))); 
+      tr.appendChild(td(levent.toUpperCase()==="STOP" ? durationStrToHHMMSS(runDurStr) : "")); 
+      tr.appendChild(td(levent.toUpperCase()==="START" ? durationStrToHHMMSS(stopDurStr) : ""));
       let tdNote = document.createElement('td');
       tdNote.innerHTML = `<span class='note'>${cleanNote(lnote)}</span>`;
-      // Show Edit button only for STOP events (as per original logic, assuming notes are for downtime)
-      // Or adjust if notes can be for START events too. Let's assume for STOP events.
-      if (levent.toUpperCase() === "STOP") { 
-        tdNote.innerHTML += ` <button class='notebtn' onclick='showNoteForm("${noteFormId}")'>Edit</button>`;
-        tdNote.innerHTML += noteFormHtml;
-      }
+      tdNote.innerHTML += ` <button class='notebtn' onclick='showNoteForm("${noteFormId}")'>Edit</button>`;
+      tdNote.innerHTML += noteFormHtml;
       tr.appendChild(tdNote);
       tbody.appendChild(tr);
-    } else { // Mobile card view
+    } else { 
       let card = document.createElement('div');
       card.className = 'eventCard';
       card.innerHTML =
@@ -1606,26 +1563,24 @@ function renderTable() {
         <div><b>Run Duration:</b> ${(levent.toUpperCase()==="STOP"? durationStrToHHMMSS(runDurStr) : "")}</div>
         <div><b>Stop Duration:</b> ${(levent.toUpperCase()==="START"? durationStrToHHMMSS(stopDurStr) : "")}</div>
         <div><b>Note:</b> <span class='note'>${cleanNote(lnote)}</span>
-        ${(levent.toUpperCase() === "STOP" ? ` <button class='notebtn' onclick='showNoteForm("${noteFormId}")'>Edit</button>` : "")}
-        ${levent.toUpperCase() === "STOP" ? noteFormHtml : ""}</div>`;
+        <button class='notebtn' onclick='showNoteForm("${noteFormId}")'>Edit</button>
+        ${noteFormHtml}</div>`; 
       mobileDiv.appendChild(card);
     }
   }
-  document.getElementById('eventCount').innerHTML = "<b>Total Events Displayed:</b> " + (isMobile ? mobileDiv.children.length : tbody.children.length);
-  document.getElementById('eventTable').style.display = isMobile ? 'none' : '';
-  mobileDiv.style.display = isMobile ? '' : 'none';
+  const eventCountEl = document.getElementById('eventCount');
+  if(eventCountEl) eventCountEl.innerHTML = "<b>Events Displayed:</b> " + (isMobile ? mobileDiv.children.length : tbody.children.length); 
+  
+  const eventTableEl = document.getElementById('eventTable');
+  if(eventTableEl) eventTableEl.style.display = isMobile ? 'none' : '';
+  if(mobileDiv) mobileDiv.style.display = isMobile ? '' : 'none';
 
   if (window.openNoteFormId) showNoteForm(window.openNoteFormId);
-
   if (!scrollInhibit) {
     if (isMobile) {
-      let mobDiv = document.getElementById('mobileEvents');
-      if (mobDiv) mobDiv.scrollTop = 0;
+      if (mobileDiv) mobileDiv.scrollTop = 0;
     } else {
-      // For desktop, scrolling the table container might be better if it's the scrollable part
-      // let tableContainer = document.querySelector('#eventTable').parentElement; // Assuming table is in a scrollable div
-      // if (tableContainer) tableContainer.scrollTop = 0;
-      window.scrollTo({top:0, behavior:'auto'}); // 'auto' for instant scroll
+      window.scrollTo({top:0, behavior:'auto'}); 
     }
   }
 }
@@ -1633,13 +1588,13 @@ function showNoteForm(noteFormId) {
   document.querySelectorAll('.noteform').forEach(f => f.style.display='none');
   let form = document.getElementById(noteFormId);
   if (form) { form.style.display = 'flex'; window.openNoteFormId = noteFormId; }
-  stopAutoRefresh(); // Pause refresh when editing a note
+  stopAutoRefresh(); 
 }
 function hideNoteForm(noteFormId) {
   let form = document.getElementById(noteFormId);
   if (form) form.style.display = 'none';
   window.openNoteFormId = null;
-  startAutoRefresh(); // Resume refresh
+  startAutoRefresh(); 
 }
 function submitNote(e, ldate, ltime, lasset) {
   e.preventDefault();
@@ -1647,93 +1602,94 @@ function submitNote(e, ldate, ltime, lasset) {
   let fd = new FormData(form);
   let params = new URLSearchParams();
   for (const pair of fd.entries()) params.append(pair[0], pair[1]);
-  
   fetch('/api/note', {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
     body: params.toString()
   }).then(r => {
     if (r.ok) {
-        // Optimistically update or just re-fetch. Re-fetching is simpler.
         fetchAndRenderEvents(); 
     } else {
-        alert("Failed to save note.");
+        alert("Failed to save note. Status: " + r.status); 
     }
   }).catch(err => {
     console.error("Error saving note:", err);
-    alert("Error saving note.");
+    alert("Error saving note. Check console.");
   });
-
-  form.style.display = 'none'; // Hide form immediately
+  form.style.display = 'none'; 
   window.openNoteFormId = null;
-  startAutoRefresh(); // Resume refresh
-  return false; // Prevent default form submission
+  startAutoRefresh(); 
+  return false; 
 }
 function toggleScrollInhibit(btn) {
   scrollInhibit = !scrollInhibit;
-  btn.innerText = scrollInhibit ? "Enable Auto-Scroll" : "Inhibit Auto-Scroll";
+  if(btn) btn.innerText = scrollInhibit ? "Enable Auto-Scroll" : "Inhibit Auto-Scroll"; 
 }
 
-// Initialize page
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', fetchChannelsAndStart);
+  document.addEventListener('DOMContentLoaded', initializeEventPage);
 } else {
-  fetchChannelsAndStart();
+  initializeEventPage();
 }
-)rawliteral";
-  html += "</script>";
-  html += "</head><body>";
-  html += "<header>Event Log</header>";
-  html += "<nav class='nav'>";
-  html += "<a href='/'>Dashboard</a>"; // Changed to <a>
-  html += "<a href='/config'>Setup</a>"; // Changed to <a>
-  html += "<a href='/export_log'>Export CSV</a>"; // Changed to <a>
-  html += "</nav>";
-  html += "<div class='main card'>";
-  html += "<div class='filterrow'><label for='channelFilter'>Filter by Asset:</label> <select id='channelFilter'><option value='ALL'>All Assets</option></select>"; // Changed label
-  html += "<label for='stateFilter'>Event State:</label> <select id='stateFilter'><option value='ALL'>All</option><option value='RUNNING'>Running</option><option value='STOPPED'>Stopped</option></select>";
-  html += "<span id='eventCount' style='margin-left:1em;'></span>";
-  html += "<button class='scrollToggle' id='scrollBtn' type='button' onclick='toggleScrollInhibit(this)'>Inhibit Auto-Scroll</button></div>";
-  html += "<div style='overflow-x:auto;'><table id='eventTable'><thead><tr>"; // Table container
-  html += "<th>Date</th><th>Time</th><th>Asset</th><th>Event</th><th>State</th><th>Avail(%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Run Duration</th><th>Stop Duration</th><th>Note</th>"; // Table Headers
-  html += "</tr></thead><tbody id='tbody'></tbody></table>";
-  html += "<div id='mobileEvents'></div>"; // Container for mobile cards
-  html += "</div></div></body></html>";
-  return html;
+)rawliteral");
+  server.sendContent("</script>");
+  server.sendContent("</head><body>");
+  server.sendContent("<header><div style='font-size:1.6em;font-weight:700;'>Event Log</div></header>");
+  String navHtml = "<nav class='nav'>";
+  navHtml += "<a href='/' class='nav-btn'>Dashboard</a>";
+  navHtml += "<a href='/config' class='nav-btn'>Setup</a>";
+  navHtml += "<a href='/export_log' class='nav-btn'>Export CSV</a>";
+  navHtml += "</nav>";
+  server.sendContent(navHtml);
+
+  String mainContentHtml = "<div class='main card'>";
+  mainContentHtml += "<div class='filterrow'><label for='channelFilter'>Filter by Channel:</label> <select id='channelFilter'><option value='ALL'>All Assets</option></select>";
+  mainContentHtml += "<label for='stateFilter'>Event State:</label> <select id='stateFilter'><option value='ALL'>All</option><option value='RUNNING'>Running</option><option value='STOPPED'>Stopped</option></select>";
+  mainContentHtml += "<span id='eventCount' style='margin-left:1em;'></span>";
+  mainContentHtml += "<button class='scrollToggle' id='scrollBtn' type='button' onclick='toggleScrollInhibit(this)'>Inhibit Auto-Scroll</button></div>";
+  
+  mainContentHtml += "<div style='overflow-x:auto;'><table id='eventTable'><thead><tr>";
+  mainContentHtml += "<th>Date</th><th>Time</th><th>Asset</th><th>Event</th><th>State</th><th>Avail(%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Run Duration</th><th>Stop Duration</th><th>Note</th>";
+  mainContentHtml += "</tr></thead><tbody id='tbody'></tbody></table>";
+  mainContentHtml += "<div id='mobileEvents'></div>";
+  mainContentHtml += "</div></div></body></html>"; // Closing main card, main div, body, html
+  server.sendContent(mainContentHtml);
+  
+  server.sendContent(""); // Finalize
 }
 
-// --- htmlConfig() function ---
+
 String htmlConfig() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<style>";
   html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}";
-  html += "header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001;font-size:1.6em;font-weight:700;}"; // Styled header
-  html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem auto;flex-wrap:wrap;align-items:center;max-width:700px;}"; // Centered nav, max-width
-  html += ".nav button, .nav a {text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;cursor:pointer;margin-bottom:0.5em;}"; // Combined button and <a>
-  html += ".nav button:hover, .nav a:hover {background:#e3f0fc;}";
-  html += ".nav .right{margin-left:auto;}"; // For right-aligning specific items if needed
+  html += "header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001; font-size:1.6em; font-weight:700;}"; 
+  html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;align-items:center;}";
+  html += ".nav button, .nav a {text-decoration:none;background:#fff;color:#1976d2;border:none;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;cursor:pointer;}"; 
+  html += ".nav button:hover, .nav a:hover {background:#e3f0fc;}"; 
+  html += ".nav .right{margin-left:auto;}"; 
   html += ".main{max-width:700px;margin:1rem auto;padding:1rem;}";
   html += ".card{background:#fff;border-radius:10px;box-shadow:0 2px 16px #0002;margin-bottom:1.3rem;padding:1.3rem;}";
-  html += "label{font-weight:500;margin-top:1em;display:block;}input[type=text],input[type=number],select{width:100%;padding:0.6em;margin-top:0.2em;margin-bottom:1em;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;}"; // Added box-sizing
-  html += "input[type=submit],button.form-button{width:100%;margin-top:1em;padding:0.8em 1.5em;font-size:1.15em;border-radius:8px;border:none;background:#1976d2;color:#fff;font-weight:700;cursor:pointer;}"; // Generic form button class
-  html += ".notice{background:#e6fbe7;color:#256029;font-weight:bold;padding:0.6em 1em;border-radius:7px;margin-bottom:1em;text-align:center;}"; // Centered notice
+  html += "label{font-weight:500;margin-top:1em;display:block;}input[type=text],input[type=number],select{width:100%;padding:0.6em;margin-top:0.2em;margin-bottom:1em;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;}"; 
+  html += "input[type=submit].form-button,button.form-button{width:100%;margin-top:1em;padding:0.8em 1.5em;font-size:1.15em;border-radius:8px;border:none;background:#1976d2;color:#fff;font-weight:700;cursor:pointer;}"; 
+  html += ".notice{background:#e6fbe7;color:#256029;font-weight:bold;padding:0.6em 1em;border-radius:7px;margin-bottom:1em;text-align:center;}"; 
   html += "button.wifi-reconfig{background:#f44336 !important; color:#fff !important;}"; 
   html += ".config-tile { margin-bottom: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }";
-  html += ".config-tile-header { background-color: #e9eff4; color: #1976d2; padding: 0.8em 1em; width: 100%; border: none; text-align: left; font-size: 1.1em; font-weight: 700; cursor: pointer; display:flex; justify-content:space-between; align-items:center;}"; // Flex for icon alignment
+  html += ".config-tile-header { background-color: #e9eff4; color: #1976d2; padding: 0.8em 1em; width: 100%; border: none; text-align: left; font-size: 1.1em; font-weight: 700; cursor: pointer; display:flex; justify-content:space-between; align-items:center;}"; 
   html += ".config-tile-header:hover { background-color: #dce7f0; }";
-  html += ".config-tile-header .toggle-icon { font-size: 1.2em; transition: transform 0.2s; }"; // Removed margin-left
-  html += ".config-tile-header.active .toggle-icon { transform: rotate(45deg); }";
+  html += ".config-tile-header .toggle-icon { font-size: 1.2em; transition: transform 0.2s; margin-left: 10px; }";
+  html += ".config-tile-header.active .toggle-icon { transform: rotate(45deg); }"; 
   html += ".config-tile-content { padding: 0 1.3rem 1.3rem 1.3rem; display: none; background-color: #fff; border-top: 1px solid #e0e0e0;}";
-  html += ".config-tile-content.open { display: block; }";
-  html += ".config-tile-content fieldset { border:1px solid #e0e0e0;padding:1em;border-radius:7px;margin-top:1em;margin-bottom:0.5em; }";
+  html += ".config-tile-content.open { display: block; }"; 
+  html += ".config-tile-content fieldset { border:1px solid #e0e0e0;padding:1em;border-radius:7px;margin-top:1em;margin-bottom:0.5em; }"; 
   html += ".config-tile-content fieldset legend { font-weight:700;color:#2196f3;font-size:1.05em;padding:0 0.5em; }";
-  html += "@media(max-width:700px){.main{padding:0.5rem;} .card{padding:0.7rem;} input[type=submit],button.form-button{font-size:1em;} .config-tile-content{padding:0 0.7rem 0.7rem 0.7rem;}}";
+  html += "@media(max-width:700px){.main{padding:0.5rem;} .card{padding:0.7rem;} input[type=submit].form-button,button.form-button{font-size:1em;} .config-tile-content{padding:0 0.7rem 0.7rem 0.7rem;}}"; 
   html += "</style>";
   html += "<script>";
-  html += "function clearLogDblConfirm(e){ if(!confirm('Are you sure you want to CLEAR ALL LOG DATA?')){e.preventDefault();return false;} if(!confirm('Double check: This cannot be undone! Are you REALLY sure?')){e.preventDefault();return false;} return true; }"; // Simplified confirm
-  html += "function showSavedMsg(){ const notice = document.getElementById('saveNotice'); if(notice) notice.style.display='block'; }"; // Check if notice exists
-  html += "function confirmWiFiReconfig(e){ if(!confirm('Are you sure you want to enter WiFi setup mode? The device will disconnect from the current network and restart as an Access Point.')){e.preventDefault();return false;} return true;}"; // Simplified confirm
+  html += "function clearLogDblConfirm(e){ if(!confirm('Are you sure you want to CLEAR ALL LOG DATA?')){e.preventDefault();return false;} if(!confirm('Double check: This cannot be undone! Are you REALLY sure?')){e.preventDefault();return false;} return true; }"; 
+  html += "function showSavedMsg(){ const notice = document.getElementById('saveNotice'); if(notice) notice.style.display='block'; }"; 
+  html += "function confirmWiFiReconfig(e){ if(!confirm('Are you sure you want to enter WiFi setup mode? The device will disconnect from the current network and restart as an Access Point.')){e.preventDefault();return false;} return true;}"; 
   html += "function setupConfigTiles() {";
   html += "  document.querySelectorAll('.config-tile-header').forEach(header => {";
   html += "    header.addEventListener('click', () => {";
@@ -1749,43 +1705,40 @@ String htmlConfig() {
   html += "      }";
   html += "    });";
   html += "  });";
-  html += "  const firstTileHeader = document.querySelector('.config-tile:first-child .config-tile-header');"; // Auto-open first tile
-  html += "  if (firstTileHeader) {";
-  html += "    firstTileHeader.click();"; // Simulate click to open and set icon
+  html += "  const firstTileHeader = document.querySelector('.config-tile:first-child .config-tile-header');";
+  html += "  if (firstTileHeader && !firstTileHeader.classList.contains('active')) {"; 
+  html += "    firstTileHeader.click();"; 
   html += "  }";
   html += "}";
   html += "document.addEventListener('DOMContentLoaded', setupConfigTiles);";
   html += "</script>";
-  html += "</head><body>";
-  html += "<header>Setup</header>"; // Simpler header text
+  html += "</head><body>"; 
+  html += "<header>Setup</header>"; 
   html += "<nav class='nav'>";
-  html += "<a href='/'>Dashboard</a>"; // Changed to <a>
-  html += "<a href='/events'>Event Log</a>"; // Changed to <a>
-  html += "<a href='/export_log'>Export CSV</a>"; // Changed to <a>
-  html += "<form action='/clear_log' method='POST' style='display:inline;margin:0;' onsubmit='return clearLogDblConfirm(event);'><button type='submit' style='background:#f44336;color:#fff;' class='right'>Clear Log Data</button></form>"; // Removed extra margin
+  html += "<a href='/' class='nav-btn'>Dashboard</a>"; 
+  html += "<a href='/events' class='nav-btn'>Event Log</a>";
+  html += "<a href='/export_log' class='nav-btn'>Export CSV</a>";
+  html += "<form action='/clear_log' method='POST' style='display:inline;margin:0;' onsubmit='return clearLogDblConfirm(event);'><button type='submit' style='background:#f44336;color:#fff;' class='nav-btn right'>Clear Log Data</button></form>"; 
   html += "</nav>";
   html += "<div class='main'><div class='card'>"; 
+  html += "<form method='POST' action='/save_config' id='setupform' onsubmit='setTimeout(showSavedMsg, 500);'>"; 
+  html += "<div id='saveNotice' class='notice' style='display:none;'>Settings saved! Device is rebooting...</div>";
 
-  html += "<form method='POST' action='/save_config' id='setupform' onsubmit='setTimeout(showSavedMsg, 500);'>"; // Shorter delay for notice
-  html += "<div id='saveNotice' class='notice' style='display:none;'>Settings saved! Device is rebooting...</div>"; // Updated notice text
-
-  // Tile 1: Asset Setup
   html += "<div class='config-tile'>";
   html += "  <button type='button' class='config-tile-header'>Asset Setup <span class='toggle-icon'>+</span></button>";
   html += "  <div class='config-tile-content'>";
   html += "    <label>Asset count (max " + String(MAX_ASSETS) + "): <input type='number' name='assetCount' min='1' max='" + String(MAX_ASSETS) + "' value='" + String(config.assetCount) + "' required></label>";
-  html += "    <p style='font-size:0.9em; color:#555; margin-top:-0.5em; margin-bottom:1em;'>To change the number of assets, update this count and click 'Save All Settings & Reboot'. The page will refresh with the new number of asset fields after reboot.</p>";
+  html += "    <p style='font-size:0.9em; color:#555; margin-top:-0.5em; margin-bottom:1em;'>To change the number of assets, update this count and click 'Save All Settings & Reboot'. The page will refresh.</p>"; 
   for (uint8_t i = 0; i < config.assetCount; ++i) {
-    if (i >= MAX_ASSETS) break; // Safety break
+    if (i >= MAX_ASSETS) break; 
     html += "    <fieldset><legend>Asset #" + String(i+1) + "</legend>";
     html += "      <label>Name: <input type='text' name='name" + String(i) + "' value='" + String(config.assets[i].name) + "' maxlength='31' required></label>";
-    html += "      <label>GPIO Pin: <input type='number' name='pin" + String(i) + "' value='" + String(config.assets[i].pin) + "' min='0' max='39' required></label>"; // Max GPIO for ESP32
+    html += "      <label>GPIO Pin: <input type='number' name='pin" + String(i) + "' value='" + String(config.assets[i].pin) + "' min='0' max='39' required></label>";
     html += "    </fieldset>";
   }
   html += "  </div>"; 
   html += "</div>"; 
 
-  // Tile 2: Operational Settings
   html += "<div class='config-tile'>";
   html += "  <button type='button' class='config-tile-header'>Operational Settings <span class='toggle-icon'>+</span></button>";
   html += "  <div class='config-tile-content'>";
@@ -1795,20 +1748,18 @@ String htmlConfig() {
   html += "  </div>"; 
   html += "</div>"; 
   
-  // Tile 3: Downtime Reasons
   html += "<div class='config-tile'>";
   html += "  <button type='button' class='config-tile-header'>Downtime Quick Reasons <span class='toggle-icon'>+</span></button>";
   html += "  <div class='config-tile-content'>";
-  for (int i = 0; i < 5; ++i) { // Assuming 5 reasons
+  for (int i = 0; i < 5; ++i) { 
     html += "    <label>Reason " + String(i+1) + ": <input type='text' name='reason" + String(i) + "' value='" + String(config.downtimeReasons[i]) + "' maxlength='31'></label>";
   }
   html += "  </div>"; 
   html += "</div>"; 
 
-  html += "<input type='submit' value='Save All Settings & Reboot' class='form-button'>"; // Used class for styling
+  html += "<input type='submit' value='Save All Settings & Reboot' class='form-button' style='width:100%; margin-top:1.5rem;'>"; 
   html += "</form>"; 
 
-  // Tile 4: Network Configuration
   html += "<div class='config-tile' style='margin-top:1.5rem;'>";
   html += "  <button type='button' class='config-tile-header'>Network Configuration <span class='toggle-icon'>+</span></button>";
   html += "  <div class='config-tile-content'>";
@@ -1822,9 +1773,10 @@ String htmlConfig() {
     html += "Not Connected / Status Unknown";
   }
   html += "</p>";
-  html += "    <p style='margin-top:0.5em; margin-bottom:1em;'>If you need to connect to a different WiFi network or re-enter credentials, use the button below. The device will restart in WiFi Setup Mode where you can enter new details.</p>";
-  // Changed to a GET link for simplicity, matching the setup() route for /reconfigure_wifi
-  html += "    <a href='/reconfigure_wifi' class='form-button wifi-reconfig' onclick='return confirmWiFiReconfig(event);' style='text-decoration:none;display:block;text-align:center;'>Enter WiFi Setup Mode</a>";
+  html += "    <p style='margin-top:0.5em; margin-bottom:1em;'>If you need to connect to a different WiFi network or re-enter credentials, use the button below. The device will restart in WiFi Setup Mode.</p>"; 
+  html += "    <form method='POST' action='/reconfigure_wifi' onsubmit='return confirmWiFiReconfig(event);' style='margin-top:0.5em;'>"; 
+  html += "      <button type='submit' class='form-button wifi-reconfig'>Enter WiFi Setup Mode</button>"; 
+  html += "    </form>";
   html += "  </div>"; 
   html += "</div>"; 
 
@@ -1832,64 +1784,48 @@ String htmlConfig() {
   return html;
 }
 
-// --- handleWiFiReconfigurePost() ---
-// This function is called when the "Enter WiFi Setup Mode" button is clicked (if it's a POST)
-// Or can be triggered by a GET request to /reconfigure_wifi as well.
 void handleWiFiReconfigurePost() {
-  // This function will now be responsible for initiating the config portal.
-  // It should ideally clear existing WiFi credentials from Preferences first.
-  Serial.println("handleWiFiReconfigurePost: Clearing WiFi credentials and starting Config Portal.");
-  
-  Preferences localPrefs;
-  if (localPrefs.begin("assetmon", false)) { // Open for read/write
-    localPrefs.remove("ssid");
-    localPrefs.remove("pass");
-    localPrefs.end();
-    Serial.println("WiFi credentials cleared from Preferences.");
-  } else {
-    Serial.println("Failed to open preferences to clear WiFi credentials.");
-  }
+  prefs.begin("assetmon", false);
+  prefs.remove("ssid");
+  prefs.remove("pass");
+  prefs.end();
+  Serial.println("WiFi credentials cleared. Restarting in AP mode for reconfiguration.");
 
   String message = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>WiFi Reconfiguration</title>";
   message += "<style>body{font-family: Arial, sans-serif; margin: 20px; padding: 15px; border:1px solid #ddd; border-radius:5px; text-align:center;} h2{color:#333;}</style>";
   message += "</head><body>";
-  message += "<h2>Device Restarting for WiFi Setup</h2>"; // Updated message
+  message += "<h2>Device Restarting for WiFi Setup</h2>"; 
   message += "<p>The device will now restart and then create an Access Point named '<strong>AssetMonitor_Config</strong>'.</p>";
   message += "<p>Please connect your computer or phone to that WiFi network.</p>";
-  message += "<p>Then, open a web browser and go to <strong>192.168.4.1</strong> to configure the new WiFi settings.</p>";
+  message += "<p>Then, open a web browser and go to <strong>http://192.168.4.1</strong> to configure the new WiFi settings.</p>";
   message += "<p>The device will restart again after you save the new settings from that page.</p>";
   message += "<p>This page will attempt to redirect shortly...</p>";
-  message += "<meta http-equiv='refresh' content='7;url=http://192.168.4.1/' />"; // Try to redirect after a delay
+  message += "<meta http-equiv='refresh' content='7;url=http://192.168.4.1/' />"; 
   message += "</body></html>";
   
   server.sendHeader("Connection", "close"); 
   server.send(200, "text/html", message);
+  delay(1000); 
   
-  delay(1000); // Allow time for the message to be sent
-  ESP.restart(); // Restart the ESP. On next boot, setupWiFiSmart will see no creds and start AP.
-  // startConfigPortal(); // Calling this directly might not work as expected if client is still connected or if ESP needs full reboot.
-                       // A full reboot ensures a clean start for AP mode.
+  ESP.restart(); 
 }
 
-// --- ASSET DETAIL PAGE ---
 String htmlAssetDetail(uint8_t idx) {
-  if (idx >= config.assetCount || idx >= MAX_ASSETS) return "Invalid Asset Index"; // Added MAX_ASSETS check
+  if (idx >= config.assetCount || idx >= MAX_ASSETS) return "Invalid Asset Index"; 
+  String assetNameStr = String(config.assets[idx].name); 
   String html = "<!DOCTYPE html><html><head><title>Asset Detail: ";
-  html += String(config.assets[idx].name) + "</title>";
+  html += assetNameStr + "</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<style>body{font-family:Roboto,Arial,sans-serif;margin:2em;background:#f3f7fa;} .card{background:#fff;padding:1.5em;border-radius:8px;box-shadow:0 2px 10px #0001;} a{color:#1976d2;text-decoration:none;} a:hover{text-decoration:underline;}</style>";
   html += "</head><body><div class='card'>";
-  html += "<h1>Asset Detail: " + String(config.assets[idx].name) + "</h1>";
+  html += "<h1>Asset Detail: " + assetNameStr + "</h1>";
   html += "<p><strong>GPIO Pin:</strong> " + String(config.assets[idx].pin) + "</p>";
-  // Add more details here if needed, e.g., current state, recent events for this asset
   html += "<p><a href='/'>Back to Dashboard</a></p>";
-  html += "<p><a href='/analytics?asset=" + urlEncode(config.assets[idx].name) + "'>View Analytics for this Asset</a></p>";
+  html += "<p><a href='/analytics?asset=" + urlEncode(assetNameStr) + "'>View Analytics for this Asset</a></p>";
   html += "</div></body></html>";
   return html;
 }
 
-
-// --- handleConfigPost() --- (Main configuration save)
 void handleConfigPost() {
   if (server.hasArg("assetCount")) {
     uint8_t oldAssetCount = config.assetCount; 
@@ -1904,7 +1840,7 @@ void handleConfigPost() {
           config.assets[i].pin = 0;          
         }
       }
-    } // Note: Does not handle decreasing assetCount (data for removed assets remains in struct but isn't used)
+    }
 
     for (uint8_t i = 0; i < config.assetCount; ++i) {
       if (i < MAX_ASSETS) { 
@@ -1926,10 +1862,10 @@ void handleConfigPost() {
     }
     if (server.hasArg("tzOffset")) {
         float offsetHours = server.arg("tzOffset").toFloat();
-        config.tzOffset = static_cast<int>(offsetHours * 3600); // Convert hours to seconds
+        config.tzOffset = static_cast<int>(offsetHours * 3600);
         config.tzOffset = constrain(config.tzOffset, -12 * 3600, 14 * 3600);
     }
-    for (int i = 0; i < 5; ++i) { // Assuming 5 downtime reasons
+    for (int i = 0; i < 5; ++i) {
       String key = "reason" + String(i);
       if (server.hasArg(key)) {
         String v = server.arg(key);
@@ -1937,20 +1873,19 @@ void handleConfigPost() {
         config.downtimeReasons[i][sizeof(config.downtimeReasons[i])-1] = '\0';
       }
     }
-    if (server.hasArg("longStopThreshold")) { // Assuming value from form is in minutes
-      config.longStopThresholdSec = constrain(server.arg("longStopThreshold").toInt() * 60, 60, 3600 * 24); // Convert mins to secs
+    if (server.hasArg("longStopThreshold")) {
+      config.longStopThresholdSec = constrain(server.arg("longStopThreshold").toInt() * 60, 60, 3600 * 24); 
     }
 
     saveConfig(); 
     
-    server.sendHeader("Location", "/config#notice"); // Redirect to config page, potentially to an anchor
+    server.sendHeader("Location", "/config#saveNotice"); 
     server.send(303);
     
-    // Ensure client connection is closed before restarting to avoid issues
-    if(server.client().connected()) {
-        server.client().stop();
+    if(server.client().connected()) { 
+        server.client().stop(); 
     }
-    delay(1000); // Give time for response to send and client to disconnect
+    delay(1000); 
     
     ESP.restart();
   } else {
@@ -1958,97 +1893,83 @@ void handleConfigPost() {
   }
 }
 
-// --- Other Handlers ---
 void handleClearLog() { 
-  if (SPIFFS.remove(LOG_FILENAME)) {
+  if(SPIFFS.remove(LOG_FILENAME)) {
     Serial.println("Log file cleared.");
   } else {
     Serial.println("Failed to clear log file.");
   }
-  // Re-initialize asset states related to log calculations if necessary,
-  // or simply let them continue from current operational data.
-  // For simplicity, just redirect. New logs will start fresh.
   server.sendHeader("Location", "/config"); 
   server.send(303); 
 }
 
 void handleExportLog() {
   File f = SPIFFS.open(LOG_FILENAME, FILE_READ);
-  if (!f || f.size() == 0) { // Check if file exists and is not empty
+  if (!f || f.size() == 0) { 
     server.send(404, "text/plain", "No log file or log is empty."); 
-    if(f) f.close();
+    if(f) f.close(); 
     return; 
   }
-  
-  time_t now_time = time(nullptr); // Renamed to avoid conflict with 'now' in other scopes
+  time_t now_time = time(nullptr); 
   struct tm * ti = localtime(&now_time);
   char fn[64];
-  strftime(fn, sizeof(fn), "AssetMonitorLog-%Y%m%d-%H%M%S.csv", ti); // More descriptive filename
+  strftime(fn, sizeof(fn), "AssetMonitorLog-%Y%m%d-%H%M%S.csv", ti); 
   
-  // Send headers first to indicate a download
-  server.sendHeader("Content-Type", "text/csv"); // Set correct MIME type
+  server.sendHeader("Content-Type", "text/csv"); 
   server.sendHeader("Content-Disposition", String("attachment; filename=\"") + fn + "\"");
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN); 
   
-  // Start streaming the file content
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN); // Use chunked encoding if size is large or unknown
-  server.send(200, "text/csv", ""); // Send headers with empty body to start
-
-  // Send the header row for the CSV
+  server.send(200, "text/csv", ""); 
   server.sendContent("Date,Time,Asset,Event,State,Availability (%),Total Runtime (min),Total Downtime (min),MTBF (min),MTTR (min),No. of Stops,Run Duration (mm:ss),Stop Duration (mm:ss),Note\n");
   
-  // Send file content in chunks
-  const size_t chunkSize = 1024;
-  char buffer[chunkSize];
+  const size_t chunkSize = 1024; 
+  char buffer[chunkSize + 1]; 
   while (f.available()) {
     size_t bytesRead = f.readBytes(buffer, chunkSize);
     if (bytesRead > 0) {
-      server.sendContent(String(buffer).substring(0, bytesRead)); // Send only actual bytes read
+      buffer[bytesRead] = '\0'; 
+      server.sendContent(String(buffer)); 
     }
   }
   f.close();
-  server.sendContent(""); // Finalize the chunked response
+  server.sendContent(""); 
   Serial.println("Log file exported.");
 }
 
-// --- API HANDLERS ---
 void handleApiSummary() {
   String json = "{\"assets\":[";
-  time_t current_time_epoch = time(nullptr); // Get current time once
-
+  time_t current_time_epoch = time(nullptr); 
   for (uint8_t i = 0; i < config.assetCount; ++i) {
-    if (i >= MAX_ASSETS) continue;
+    if (i >= MAX_ASSETS) continue; 
     if (i > 0) json += ",";
-
     AssetState& as = assetStates[i];
-    bool currentPinState = digitalRead(config.assets[i].pin); // Read pin state once
-
-    // Calculate current running/stopped time including the ongoing period
-    unsigned long currentPeriodRunningTime = as.runningTime;
-    unsigned long currentPeriodStoppedTime = as.stoppedTime;
-
-    if (as.lastState) { // Was running
-      currentPeriodRunningTime += (current_time_epoch - as.lastChangeTime);
-    } else { // Was stopped
-      currentPeriodStoppedTime += (current_time_epoch - as.lastChangeTime);
+    bool current_pin_state = digitalRead(config.assets[i].pin); 
+    
+    unsigned long current_period_runningTime = as.runningTime; 
+    unsigned long current_period_stoppedTime = as.stoppedTime;
+    
+    if (as.lastState == false ) { 
+      current_period_runningTime += (current_time_epoch - as.lastChangeTime);
+    } else { 
+      current_period_stoppedTime += (current_time_epoch - as.lastChangeTime);
     }
 
-    float avail = (currentPeriodRunningTime + currentPeriodStoppedTime) > 0 ? (100.0 * currentPeriodRunningTime / (currentPeriodRunningTime + currentPeriodStoppedTime)) : 0;
-    float total_runtime_min = currentPeriodRunningTime / 60.0;
-    float total_downtime_min = currentPeriodStoppedTime / 60.0;
+    float avail = (current_period_runningTime + current_period_stoppedTime) > 0 ? (100.0 * current_period_runningTime / (current_period_runningTime + current_period_stoppedTime)) : ( (current_pin_state == false) ? 100.0 : 0.0);
+    float total_runtime_min = current_period_runningTime / 60.0;
+    float total_downtime_min = current_period_stoppedTime / 60.0;
     
-    // MTBF/MTTR based on completed cycles (stopCount)
-    float mtbf_val = (as.stopCount > 0) ? (float)as.runningTime / as.stopCount / 60.0 : 0; // Use cumulative completed running time
-    float mttr_val = (as.stopCount > 0) ? (float)as.stoppedTime / as.stopCount / 60.0 : 0; // Use cumulative completed stopped time
+    float mtbf_val = (as.stopCount > 0) ? (float)current_period_runningTime / as.stopCount / 60.0 : total_runtime_min; 
+    float mttr_val = (as.stopCount > 0) ? (float)current_period_stoppedTime / as.stopCount / 60.0 : 0; 
 
     json += "{";
     json += "\"name\":\"" + String(config.assets[i].name) + "\",";
     json += "\"pin\":" + String(config.assets[i].pin) + ",";
-    json += "\"state\":" + String(currentPinState ? 1 : 0) + ","; // Current actual pin state
+    json += "\"state\":" + String(current_pin_state ? 0 : 1) + ","; 
     json += "\"availability\":" + String(avail, 2) + ",";
-    json += "\"total_runtime\":" + String(total_runtime_min, 2) + ","; // Reflects up-to-the-second
-    json += "\"total_downtime\":" + String(total_downtime_min, 2) + ","; // Reflects up-to-the-second
-    json += "\"mtbf\":" + String(mtbf_val, 2) + ","; // Based on completed cycles
-    json += "\"mttr\":" + String(mttr_val, 2) + ","; // Based on completed cycles
+    json += "\"total_runtime\":" + String(total_runtime_min, 2) + ","; 
+    json += "\"total_downtime\":" + String(total_downtime_min, 2) + ","; 
+    json += "\"mtbf\":" + String(mtbf_val, 2) + ","; 
+    json += "\"mttr\":" + String(mttr_val, 2) + ","; 
     json += "\"stop_count\":" + String(as.stopCount) + "}";
   }
   json += "]}";
@@ -2057,35 +1978,32 @@ void handleApiSummary() {
 
 void handleApiEvents() {
   File f = SPIFFS.open(LOG_FILENAME, FILE_READ);
-  String json = "["; // Start of JSON array
-  if (f && f.size() > 0) {
-    String line;
+  String json = "["; 
+  if (f && f.size() > 0) { 
+    String line_content; 
     bool firstEntry = true;
     while (f.available()) {
-      line = f.readStringUntil('\n');
-      line.trim(); // Remove any leading/trailing whitespace including \r
-      if (line.length() < 5) continue; // Skip empty or very short lines
-      
+      line_content = f.readStringUntil('\n');
+      line_content.trim(); 
+      if (line_content.length() < 5) continue; 
       if (!firstEntry) {
         json += ",";
       }
       firstEntry = false;
-      
-      // Escape quotes within the CSV line if it's to be a JSON string
       String escapedLine = "";
-      for (unsigned int i = 0; i < line.length(); ++i) {
-        char c = line.charAt(i);
+      for (unsigned int char_idx = 0; char_idx < line_content.length(); ++char_idx) { 
+        char c = line_content.charAt(char_idx);
         if (c == '"') escapedLine += "\\\"";
         else if (c == '\\') escapedLine += "\\\\";
-        // Add other escapes if necessary (e.g., \n, \r, \t within fields, though unlikely for this CSV)
+        else if (c < 32 || c > 126) {} 
         else escapedLine += c;
       }
       json += "\"" + escapedLine + "\"";
     }
     f.close();
   }
-  json += "]"; // End of JSON array
-  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  json += "]"; 
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate"); 
   server.sendHeader("Pragma", "no-cache");
   server.sendHeader("Expires", "-1");
   server.send(200, "application/json", json);
@@ -2095,10 +2013,10 @@ void handleApiConfig() {
   String json = "{";
   json += "\"assetCount\":" + String(config.assetCount) + ",";
   json += "\"maxEvents\":" + String(config.maxEvents) + ",";
-  json += "\"tzOffset\":" + String(config.tzOffset) + ","; // In seconds
+  json += "\"tzOffset\":" + String(config.tzOffset) + ","; 
   json += "\"assets\":[";
   for (uint8_t i = 0; i < config.assetCount; ++i) {
-    if (i >= MAX_ASSETS) continue;
+    if (i >= MAX_ASSETS) continue; 
     if (i > 0) json += ",";
     json += "{";
     json += "\"name\":\"" + String(config.assets[i].name) + "\",";
@@ -2107,125 +2025,122 @@ void handleApiConfig() {
   }
   json += "],";
   json += "\"downtimeReasons\":[";
-  for (int i = 0; i < 5; ++i) { // Assuming 5 reasons
+  for (int i = 0; i < 5; ++i) { 
     if (i > 0) json += ",";
     json += "\"" + String(config.downtimeReasons[i]) + "\"";
   }
-  json += "],"; // Added comma
-  json += "\"longStopThresholdSec\":" + String(config.longStopThresholdSec);
+  json += "]"; 
+  json += ",\"longStopThresholdSec\":" + String(config.longStopThresholdSec);
   json += "}";
   server.send(200, "application/json", json);
 }
 
 void handleApiNote() {
   if (server.method() == HTTP_POST && server.hasArg("date") && server.hasArg("time") && server.hasArg("asset")) {
-    // Extract all arguments. Note: server.arg() URL decodes by default.
-    String dateVal = server.arg("date");
-    String timeVal = server.arg("time");
-    String assetVal = server.arg("asset");
-    String noteVal = server.arg("note"); // Note might contain spaces, special chars
-    String reasonVal = server.hasArg("reason") ? server.arg("reason") : "";
-
+    String dateVal = server.arg("date"); 
+    String timeVal = server.arg("time"); 
+    String assetVal = server.arg("asset"); 
+    String noteVal = server.arg("note"); 
+    String reasonVal = server.hasArg("reason") ? server.arg("reason") : ""; 
     Serial.printf("API Note Received: Date=%s, Time=%s, Asset=%s, Reason=%s, Note=%s\n",
                   dateVal.c_str(), timeVal.c_str(), assetVal.c_str(), reasonVal.c_str(), noteVal.c_str());
-
     updateEventNote(dateVal, timeVal, assetVal, noteVal, reasonVal);
-    
-    // It's common for POST APIs to return a success status or the updated resource,
-    // rather than redirecting, unless it's a full page form submission.
-    // For a pure API, a 200 OK or 204 No Content might be more appropriate.
-    // server.send(200, "application/json", "{\"status\":\"success\", \"message\":\"Note updated\"}");
-    
-    // If the client expects a redirect (e.g., if called from a simple HTML form action):
-    server.sendHeader("Location", "/events"); // Redirect back to events page
+    server.sendHeader("Location", "/events"); 
     server.send(303); 
     return;
   }
   server.send(400, "text/plain", "Bad Request: Missing required parameters for note update.");
 }
 
-
-void updateEventNote(String date, String time, String assetName, String note, String reason) {
+void updateEventNote(String date_str, String time_str, String assetName_str, String note_str, String reason_str) { 
   File f = SPIFFS.open(LOG_FILENAME, FILE_READ);
   if (!f) { Serial.println("updateEventNote: Failed to open log file for reading."); return; }
   
-  String tempLogContent = "";
+  String tempLogContent = ""; 
   bool updated = false;
-
+  
   String combinedNewNote = "";
-  if (reason.length() > 0 && note.length() > 0) {
-    combinedNewNote = reason + " - " + note;
-  } else if (reason.length() > 0) {
-    combinedNewNote = reason;
+  if (reason_str.length() > 0 && note_str.length() > 0) {
+    combinedNewNote = reason_str + " - " + note_str;
+  } else if (reason_str.length() > 0) {
+    combinedNewNote = reason_str;
   } else {
-    combinedNewNote = note;
+    combinedNewNote = note_str;
   }
-  // Sanitize combinedNewNote: remove commas to prevent breaking CSV structure, and newlines
   combinedNewNote.replace(",", " "); 
   combinedNewNote.replace("\n", " "); 
-  combinedNewNote.replace("\r", " ");
+  combinedNewNote.replace("\r", " "); 
 
-
+  String lineBuffer = "";
   while (f.available()) {
-    String line = f.readStringUntil('\n');
-    String originalLine = line; // Keep original line ending if present
-    line.trim(); // Work with trimmed line for parsing
+    char char_read = f.read();
+    if (char_read == '\n' || !f.available()) { 
+        if (char_read != '\n' && !f.available()) lineBuffer += char_read; 
 
-    if (line.length() < 5) { // Skip empty or malformed lines
-      tempLogContent += originalLine + "\n"; // Preserve original line ending for non-target lines
-      continue;
-    }
+        String current_line_trimmed = lineBuffer;
+        current_line_trimmed.trim(); 
+        
+        String original_line_to_write = lineBuffer + (char_read == '\n' ? "\n" : ""); 
 
-    // Smart split CSV: handles cases where note itself might have had commas (though we try to avoid it)
-    // This basic split assumes note is the last field and doesn't contain unescaped commas.
-    String parts[14]; // Date,Time,Asset,Event,State,Avail,RunT,DownT,MTBF,MTTR,Stops,RunDur,StopDur,Note
-    int partIdx = 0;
-    int lastComma = -1;
-    for(int i=0; i<13; ++i) { // Read first 13 fields
-        int nextComma = line.indexOf(',', lastComma + 1);
-        if (nextComma == -1 && i < 12) { // Should find 12 commas for 13 fields
-            parts[partIdx++] = line.substring(lastComma + 1); // take rest of line if not enough commas
-            for (int j=partIdx; j<13; ++j) parts[j] = ""; // fill rest with empty
-            break;
-        } else if (nextComma == -1 && i == 12) { // Last field before note
-             parts[partIdx++] = line.substring(lastComma + 1);
-             break;
+        if (current_line_trimmed.length() < 5) { 
+          tempLogContent += original_line_to_write; 
+          lineBuffer = ""; 
+          continue;
         }
-        parts[partIdx++] = line.substring(lastComma + 1, nextComma);
-        lastComma = nextComma;
-    }
-    // The rest is the note
-    if (lastComma != -1 && lastComma < (int)line.length() - 1) {
-        parts[13] = line.substring(lastComma + 1);
-    } else if (partIdx == 13) { // If we read 13 fields, the 14th (note) might be empty
-        parts[13] = "";
-    }
+
+        String parts[3]; 
+        int partIdx = 0;
+        int lastComma = -1;
+        for(int k=0; k<3; ++k) { 
+            int nextComma = current_line_trimmed.indexOf(',', lastComma + 1);
+            if (nextComma == -1) { 
+                parts[partIdx++] = current_line_trimmed.substring(lastComma + 1); 
+                break; 
+            }
+            parts[partIdx++] = current_line_trimmed.substring(lastComma + 1, nextComma);
+            lastComma = nextComma;
+        }
+        for(int k=partIdx; k<3; ++k) parts[k] = ""; 
 
 
-    if (partIdx >= 3 && parts[0] == date && parts[1] == time && parts[2] == assetName) {
-      // Found the line to update. Reconstruct it with the new note.
-      String updatedLine = "";
-      for(int i=0; i<13; ++i) { // First 13 fields
-          updatedLine += parts[i] + ",";
-      }
-      updatedLine += combinedNewNote; // Add the new sanitized note
-      tempLogContent += updatedLine + "\n";
-      updated = true;
-      Serial.println("Found and updated event line.");
+        if (parts[0] == date_str && parts[1] == time_str && parts[2] == assetName_str) {
+          int finalCommaIndex = -1;
+          int commaCount = 0;
+          for(int char_idx_inner = 0; char_idx_inner < current_line_trimmed.length(); char_idx_inner++){ 
+              if(current_line_trimmed.charAt(char_idx_inner) == ','){
+                  commaCount++;
+                  if(commaCount == 13) { 
+                      finalCommaIndex = char_idx_inner;
+                      break;
+                  }
+              }
+          }
+          if (finalCommaIndex != -1) {
+            String lineBeforeNote = current_line_trimmed.substring(0, finalCommaIndex + 1);
+            tempLogContent += lineBeforeNote + combinedNewNote + "\n";
+          } else { 
+            tempLogContent += current_line_trimmed + "," + combinedNewNote + "\n"; 
+          }
+          updated = true;
+          Serial.println("Found and updated event line in log.");
+        } else {
+          tempLogContent += original_line_to_write; 
+        }
+        lineBuffer = ""; 
     } else {
-      tempLogContent += originalLine + "\n"; // Preserve original line ending
+        lineBuffer += char_read;
     }
   }
   f.close();
 
   if (updated) {
-    File f2 = SPIFFS.open(LOG_FILENAME, FILE_WRITE); // Open in write mode (truncates)
+    File f2 = SPIFFS.open(LOG_FILENAME, FILE_WRITE); 
     if (!f2) { Serial.println("updateEventNote: Failed to open log file for writing."); return; }
     f2.print(tempLogContent);
     f2.close();
     Serial.println("Log file rewritten with updated note.");
   } else {
-    Serial.println("Event to update not found in log.");
+    Serial.println("Event to update note for was not found in log.");
   }
 }
 
