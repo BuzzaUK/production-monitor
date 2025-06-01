@@ -1060,16 +1060,25 @@ function fetchConfigAndEvents() { // Renamed and combined
     });
 }
 
-function setupRangePickers() { /* User's version - seems fine */
+function setupRangePickers() {
   let defaultFromDate, defaultToDate;
   if (allEvents.length > 0) {
     try {
-      let eventDates = allEvents.map(e => parseEventDate(e)).filter(d => d.getTime() !== 0); 
+      let eventDates = allEvents.map(e => parseEventDate(e)).filter(d => d.getTime() !== 0);
       if (eventDates.length > 0) {
-        defaultToDate = new Date(Math.max.apply(null, eventDates)); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); 
-      } else { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
-    } catch (e) { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
-  } else { defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000); }
+        defaultToDate = new Date(Math.max.apply(null, eventDates));
+        defaultFromDate = new Date(Math.min.apply(null, eventDates)); // PATCH: Use earliest event as from
+      } else {
+        defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000);
+      }
+    } catch (e) {
+      defaultToDate = new Date(); defaultFromDate = new Date(defaultToDate.getTime() - 12 * 60 * 60 * 1000);
+    }
+  } else {
+    // PATCH: If no events, show full possible date range
+    defaultFromDate = new Date(1970,0,1,0,0,0,0);
+    defaultToDate = new Date();
+  }
   document.getElementById('fromTime').value = toDatetimeLocal(defaultFromDate);
   document.getElementById('toTime').value = toDatetimeLocal(defaultToDate);
   ['fromTime', 'toTime', 'showStart', 'showStop', 'showMTBF', 'showMTTR'].forEach(id => {
@@ -1123,7 +1132,17 @@ function renderEventChart() {
     } catch (e) { return false; }
   });
   renderKPIs(filteredEventsGlobal); 
-  if (filteredEventsGlobal.length === 0) { if (eventChart) { eventChart.destroy(); eventChart = null; } const chartCanvas = document.getElementById('eventChart'); if(chartCanvas){const ctx = chartCanvas.getContext('2d'); if(ctx){ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height); ctx.fillText("No events in range/filters.",chartCanvas.width/2,chartCanvas.height/2);}} return; }
+  if (filteredEventsGlobal.length === 0) {
+  if (eventChart) { eventChart.destroy(); eventChart = null; }
+  const chartCanvas = document.getElementById('eventChart');
+  if (chartCanvas) {
+    const ctx = chartCanvas.getContext('2d');
+    ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+    ctx.font = '20px Arial'; ctx.textAlign = 'center';
+    ctx.fillText("No data found for this asset and date range.", chartCanvas.width/2, chartCanvas.height/2);
+  }
+  return;
+}
 
   try {
     let times = filteredEventsGlobal.map(e => e[1]); 
