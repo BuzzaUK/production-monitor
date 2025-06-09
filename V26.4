@@ -910,7 +910,7 @@ void loop() {
         if (config.monitoringMode == MONITORING_MODE_SERIAL && g_isSystemSerialDown &&
             strlen(g_serialSystemTriggerAssetName) > 0 &&
             strcmp(config.assets[i].name, g_serialSystemTriggerAssetName) != 0) {
-          snprintf(eventNoteBuffer, sizeof(eventNoteBuffer), "Consequence Stop (System: %s)", g_serialSystemTriggerAssetName);
+          snprintf(eventNoteBuffer, sizeof(eventNoteBuffer), "Root Cause (System: %s)", g_serialSystemTriggerAssetName);
         }
         logEvent(i, false, now_ts, eventNoteBuffer[0] ? eventNoteBuffer : nullptr, runDuration, 0);
       
@@ -1913,7 +1913,7 @@ function fetchAnalyticsData() {
           const rowLength = e_row.length;
           const targetAssetNormalized_fetch = normalizeAssetName(asset);
           let passes = true; let reasonForFailure = "";
-          if (rowLength < 13) { passes = false; reasonForFailure = `Length < 13 (is ${rowLength}).`;}
+          if (rowLength < 12) { passes = false; reasonForFailure = `Length < 13 (is ${rowLength}).`;}
           else if (!eventAssetField && typeof eventAssetField !== 'string') { passes = false; reasonForFailure = "Asset field e[2] missing/invalid.";}
           else { const normalizedEventAsset = normalizeAssetName(eventAssetField); if (normalizedEventAsset !== targetAssetNormalized_fetch) { passes = false; reasonForFailure = `Asset mismatch: '${normalizedEventAsset}' !== '${targetAssetNormalized_fetch}'.`;}}
           if (targetAssetNormalized_fetch === "line 1" || targetAssetNormalized_fetch === "line 2" ) { console.log( `FILTER ROW (Target: ${asset}): Raw: [${e_row.map(f => `"${f}"`).join(',')}] Len: ${rowLength}, Asset: '${eventAssetField}', Type: '${eventTypeField}', Passes: ${passes}${passes ? '' : ` (FAIL: ${reasonForFailure})`}`); }
@@ -1980,16 +1980,15 @@ String htmlAnalyticsCompare() {
   html += "</nav>";
 
   html += "<div class='container-fluid mt-4' style='max-width:1600px;'>";
-
   html += "<div id='assetOfDay' class='asset-of-day mb-3'></div>";
   html += "<div id='leaderboard'></div>";
   html += "<div class='kpi-cards' id='kpiCards'></div>";
 
   html += "<div class='bar-charts-row'>";
-  html += "  <div class='chart-col'><div class='card shadow-sm mb-3'><div class='card-body'><canvas id='barAvail' height='220'></canvas></div></div></div>";
-  html += "  <div class='chart-col'><div class='card shadow-sm mb-3'><div class='card-body'><canvas id='barStops' height='220'></canvas></div></div></div>";
-  html += "  <div class='chart-col'><div class='card shadow-sm mb-3'><div class='card-body'><canvas id='barMTBF' height='220'></canvas></div></div></div>";
-  html += "  <div class='chart-col'><div class='card shadow-sm mb-3'><div class='card-body'><canvas id='barReasons' height='220'></canvas></div></div></div>";
+  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barAvail' height='220'></canvas></div></div></div>";
+  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barStops' height='220'></canvas></div></div></div>";
+  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barMTBF' height='220'></canvas></div></div></div>";
+  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barReasons' height='220'></canvas></div></div></div>";
   html += "</div>";
 
   html += "<div class='card mt-3 shadow-sm'><div class='card-header'><h4>Last Event Log Summary</h4></div><div class='card-body table-responsive'>";
@@ -1998,26 +1997,48 @@ String htmlAnalyticsCompare() {
   html += "</div>";
 
   html += "<script>";
-  // PATCHED JAVASCRIPT SECTION
   html += R"rawliteral(
 let allEventsCompare = [], allAssetNamesCompare = [], configDowntimeReasonsCompare = [];
-function formatMinutesToHHMMSSCompare(val) { if (isNaN(val) || val <= 0.001) return "0:00:00"; let t = Math.round(60 * val), n = Math.floor(t / 3600), a = Math.floor(t % 3600 / 60); return t %= 60, `${n}:${a.toString().padStart(2,"0")}:${(t).toString().padStart(2,"0")}` }
-function fetchCompareDataPage() { fetch("/api/config").then(e => e.json()).then(e => { configDowntimeReasonsCompare = e.downtimeReasons || [], allAssetNamesCompare = e.assets.map(e => e.name), fetch("/api/events").then(e => e.json()).then(t => { allEventsCompare = t.map(e => Array.isArray(e) ? e : []).filter(e => e.length >= 13 && allAssetNamesCompare.includes(e[2])), renderCompareChartsPage(), renderCompareTablePage(), renderLeaderboardPage(), renderKPICards(), renderAssetOfDay() }).catch(e => console.error("CompareEventsFetchErr:", e)) }).catch(e => console.error("CompareConfigFetchErr:", e)) }
-function getLastMetricCompare(e, t) { return e && e.length ? parseFloat(e[e.length - 1][t]) : 0 }
+
+function fetchCompareDataPage() {
+  fetch('/api/config').then(e => e.json()).then(configData => {
+    configDowntimeReasonsCompare = configData.downtimeReasons || [];
+    allAssetNamesCompare = configData.assets.map(e => e.name);
+    
+    fetch('/api/events').then(e => e.json()).then(eventsData => {
+      allEventsCompare = (eventsData || []).map(e => Array.isArray(e) ? e : [])
+                                         .filter(e => e.length >= 12 && allAssetNamesCompare.includes(e[2]));
+      
+      renderLeaderboardPage();
+      renderAssetOfDay();
+      renderKPICards();
+      renderCompareChartsPage();
+      renderCompareTablePage();
+    }).catch(e => console.error("CompareEventsFetchErr:", e));
+  }).catch(e => console.error("CompareConfigFetchErr:", e));
+}
+
+function getLastMetricCompare(events, metricIndex) {
+  if (!events || events.length === 0) return 0;
+  const lastEvent = events[events.length - 1];
+  return lastEvent ? parseFloat(lastEvent[metricIndex]) : 0;
+}
 
 function renderLeaderboardPage() {
-  let byAsset = {}; allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
-  for (let e of allEventsCompare) byAsset[e[2]] && byAsset[e[2]].push(e);
-  let leaderboard = allAssetNamesCompare.map(e => {
-    let av = getLastMetricCompare(byAsset[e], 5);
-    return { name: e, availability: av, stops: (byAsset[e]||[]).filter(ev => (ev[3]||"").toUpperCase()=="STOP").length };
+  let byAsset = {};
+  allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
+  for (let e of allEventsCompare) { byAsset[e[2]] && byAsset[e[2]].push(e); }
+
+  let leaderboard = allAssetNamesCompare.map(name => {
+    const assetEvents = byAsset[name] || [];
+    const availability = getLastMetricCompare(assetEvents, 5);
+    const totalStops = parseInt(getLastMetricCompare(assetEvents, 10), 10) || 0;
+    return { name: name, availability: availability, stops: totalStops };
   });
+
   leaderboard.sort((a, b) => b.availability - a.availability);
-  let medals = [
-    "<i class='bi bi-trophy-fill' style='color:#ffd700'></i>",
-    "<i class='bi bi-trophy-fill' style='color:#aaa'></i>",
-    "<i class='bi bi-trophy-fill' style='color:#cd7f32'></i>"
-  ];
+  
+  const medals = ["<i class='bi bi-trophy-fill' style='color:#ffd700'></i>", "<i class='bi bi-trophy-fill' style='color:#aaa'></i>", "<i class='bi bi-trophy-fill' style='color:#cd7f32'></i>"];
   let html = "";
   leaderboard.forEach((row, i) => {
     html += `<div class='leaderboard-row${i==0?" top":""}'><span class='leaderboard-badge'>${medals[i]||""}</span><span class='asset-name'>${row.name}</span><span>Availability: <b>${row.availability.toFixed(2)}%</b></span><span style='margin-left:2em'>Stops: <b>${row.stops}</b></span></div>`;
@@ -2026,107 +2047,107 @@ function renderLeaderboardPage() {
 }
 
 function renderAssetOfDay() {
-  let byAsset = {}; allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
-  for (let e of allEventsCompare) byAsset[e[2]] && byAsset[e[2]].push(e);
-  let best = allAssetNamesCompare.map(e => ({ name: e, av: getLastMetricCompare(byAsset[e], 5) }))
-    .sort((a, b) => b.av - a.av)[0];
-  if (best) {
+  let byAsset = {};
+  allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
+  for (let e of allEventsCompare) { byAsset[e[2]] && byAsset[e[2]].push(e); }
+  
+  const best = allAssetNamesCompare.map(name => ({
+    name: name,
+    av: getLastMetricCompare(byAsset[name], 5)
+  })).sort((a, b) => b.av - a.av)[0];
+  
+  if (best && best.av > 0) {
     document.getElementById("assetOfDay").innerHTML = `<i class="bi bi-star-fill" style="color:#43cea2;font-size:1.3em"></i> <b>Asset of the Day:</b> <span style="color:#388e3c;font-weight:700;">${best.name}</span> with <span style="color:#388e3c;">${best.av.toFixed(2)}% Availability</span>.`;
   }
 }
 
 function renderKPICards() {
-  let byAsset = {}; allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
-  for (let e of allEventsCompare) byAsset[e[2]] && byAsset[e[2]].push(e);
-  let topAvail = allAssetNamesCompare.map(e => getLastMetricCompare(byAsset[e], 5)).reduce((a,b)=>Math.max(a,b),0);
-  let totalStops = allAssetNamesCompare.map(e => (byAsset[e]||[]).filter(ev => (ev[3]||"").toUpperCase()=="STOP").length).reduce((a,b)=>a+b,0);
-  let avgMTBF = allAssetNamesCompare.map(e => getLastMetricCompare(byAsset[e],8)).filter(x=>x>0); avgMTBF = avgMTBF.length? avgMTBF.reduce((a,b)=>a+b,0)/avgMTBF.length:0;
+  let byAsset = {};
+  allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
+  for (let e of allEventsCompare) { byAsset[e[2]] && byAsset[e[2]].push(e); }
+
+  let topAvail = allAssetNamesCompare.map(name => getLastMetricCompare(byAsset[name], 5)).reduce((a,b) => Math.max(a,b), 0);
+  let totalStops = allAssetNamesCompare.reduce((sum, name) => sum + (parseInt(getLastMetricCompare(byAsset[name], 10), 10) || 0), 0);
+  let mtbfValues = allAssetNamesCompare.map(name => getLastMetricCompare(byAsset[name], 8)).filter(x => x > 0);
+  let avgMTBF = mtbfValues.length ? mtbfValues.reduce((a,b) => a+b, 0) / mtbfValues.length : 0;
+  
   let html = "";
-  html += `<div class='kpi-card'><div class='kpi-icon'><i class="bi bi-trophy-fill" style="color:#ffc107"></i></div><div class='kpi-label'>Top Availability</div><div class='h4 mb-0' id='kpiTopAvail'>${topAvail.toFixed(2)}%</div></div>`;
+  html += `<div class='kpi-card'><div class='kpi-icon'><i class="bi bi-trophy-fill" style="color:#ffc107"></i></div><div class='kpi-label'>Top Availability</div><div class='h4 mb-0'>${topAvail.toFixed(2)}%</div></div>`;
   html += `<div class='kpi-card'><div class='kpi-icon'><i class="bi bi-exclamation-triangle-fill" style="color:#ff9800"></i></div><div class='kpi-label'>Total Stops</div><div class='h4 mb-0'>${totalStops}</div></div>`;
   html += `<div class='kpi-card'><div class='kpi-icon'><i class="bi bi-stopwatch-fill" style="color:#4caf50"></i></div><div class='kpi-label'>Avg MTBF</div><div class='h4 mb-0'>${avgMTBF.toFixed(1)} min</div></div>`;
   document.getElementById("kpiCards").innerHTML = html;
 }
 
 function renderCompareChartsPage() {
-  const GREEN = 'rgba(25, 135, 84, 0.8)', AMBER = 'rgba(255, 193, 7, 0.8)', RED = 'rgba(220, 53, 69, 0.8)';
-  const PURPLE = 'rgba(111, 66, 193, 0.8)';
+  // --- PATCH: Standardize chart color and remove gradient function ---
+  const CHART_COLOR = 'rgba(66, 165, 245, 0.7)'; // The blue color (#42a5f5) from your dashboard
+
   let byAsset = {}; allAssetNamesCompare.forEach(e => { byAsset[e] = [] });
-  for (let e of allEventsCompare) byAsset[e[2]] && byAsset[e[2]].push(e);
+  for (let e of allEventsCompare) { byAsset[e[2]] && byAsset[e[2]].push(e); }
+  
   let labels = allAssetNamesCompare;
-  let avail = labels.map(e => getLastMetricCompare(byAsset[e] || [], 5));
-  let stops = labels.map(e => (byAsset[e] || []).filter(e => "STOP" === (e[3] || "").toUpperCase()).length);
-  let mtbf = labels.map(e => getLastMetricCompare(byAsset[e] || [], 8));
-  let reasons = {}; configDowntimeReasonsCompare.forEach(e => { e && (reasons[e] = 0) });
-  // ** PATCH ** Changed index for reason from 13 to 12
-  for (let e of allEventsCompare) { if (!(e.length < 13)) { let t = e[12] || "", n = ""; n = t.includes(" - ") ? t.split(" - ")[0].trim() : t.trim(), n && reasons.hasOwnProperty(n) && reasons[n]++ } }
+  let availData = labels.map(name => getLastMetricCompare(byAsset[name], 5));
+  let stopsData = labels.map(name => parseInt(getLastMetricCompare(byAsset[name], 10), 10) || 0);
+  let mtbfData = labels.map(name => getLastMetricCompare(byAsset[name], 8));
+  
+  let reasons = {};
+  configDowntimeReasonsCompare.forEach(r => { if (r) reasons[r] = 0; });
+  const startEventsWithReasons = allEventsCompare.filter(e => (e[3] || "").toUpperCase() === 'START' && e.length >= 14 && e[13]);
+  for (let e of startEventsWithReasons) {
+      let reasonText = e[13];
+      let reason = reasonText.split(" - ")[0].trim();
+      if (reason && reasons.hasOwnProperty(reason)) {
+          reasons[reason]++;
+      }
+  }
   const reasonLabels = Object.keys(reasons).filter(e => reasons[e] > 0);
   const reasonData = reasonLabels.map(e => reasons[e]);
-  function barGradient(ctx, color1, color2) {
-    var gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, color1);
-    gradient.addColorStop(1, color2);
-    return gradient;
-  }
-  ["barAvail", "barStops", "barMTBF", "barReasons"].forEach(e => { const t = document.getElementById(e); t && t.chartInstance && t.chartInstance.destroy() });
-  const chartOptions = e => ({
-    plugins: { title: { display: !0, text: e, font: { size: 16 } }, legend: { display: false } },
-    scales: { y: { beginAtZero: !0, ticks: { stepSize: 1, precision: 0 } } },
-    responsive: !0, maintainAspectRatio: !1
-  });
-  if (document.getElementById("barAvail")) {
-    let ctx = document.getElementById("barAvail").getContext("2d");
-    document.getElementById("barAvail").chartInstance = new Chart(ctx, {
-      type: "bar",
-      data: { labels: labels, datasets: [{ label: "Availability (%)", data: avail, backgroundColor: avail.map((v,i)=>barGradient(ctx,"#7ded81","#2bcbba")) }] },
-      options: chartOptions("Availability by Asset (%)")
-    })
-  }
-  if (document.getElementById("barStops")) {
-    let ctx = document.getElementById("barStops").getContext("2d");
-    document.getElementById("barStops").chartInstance = new Chart(ctx, {
-      type: "bar",
-      data: { labels: labels, datasets: [{ label: "Total Stops", data: stops, backgroundColor: barGradient(ctx,"#ffe259","#ffa751") }] },
-      options: chartOptions("Total Stops by Asset")
-    })
-  }
-  if (document.getElementById("barMTBF")) {
-    let ctx = document.getElementById("barMTBF").getContext("2d");
-    document.getElementById("barMTBF").chartInstance = new Chart(ctx, {
-      type: "bar",
-      data: { labels: labels, datasets: [{ label: "MTBF (min)", data: mtbf, backgroundColor: barGradient(ctx,"#43cea2","#185a9d") }] },
-      options: chartOptions("MTBF by Asset (minutes)")
-    })
-  }
-  const brc = document.getElementById("barReasons");
-  if (brc) {
-    if (reasonLabels.length > 0) {
-      let ctx = brc.getContext("2d");
-      brc.chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: reasonLabels, datasets: [{ label: 'Event Count', data: reasonData, backgroundColor: barGradient(ctx,"#e0c3fc","#8ec5fc") }] },
-        options: chartOptions("Downtime Reason Distribution")
-      });
-    } else {
-      let e = brc.getContext("2d");
-      e.clearRect(0, 0, brc.width, brc.height);
-      e.textAlign = "center";
-      e.fillText("No reason data.", brc.width / 2, brc.height / 2);
-    }
+
+  ["barAvail", "barStops", "barMTBF", "barReasons"].forEach(id => {let el=document.getElementById(id); if(el && el.chartInstance) el.chartInstance.destroy();});
+  const opts = t => ({plugins:{title:{display:true,text:t,font:{size:16}},legend:{display:false}},scales:{y:{beginAtZero:true}},responsive:true,maintainAspectRatio:false});
+
+  let barStopsOpts = opts("Total Stops by Asset");
+  barStopsOpts.scales.y.ticks = { precision: 0 };
+
+  new Chart(document.getElementById("barAvail").getContext("2d"), {type:'bar',data:{labels:labels,datasets:[{label:'Avail %',data:availData,backgroundColor:CHART_COLOR, yAxisID:'y'}]},options:opts("Availability by Asset (%)")});
+  new Chart(document.getElementById("barStops").getContext("2d"), {type:'bar',data:{labels:labels,datasets:[{label:'Total Stops',data:stopsData,backgroundColor:CHART_COLOR, yAxisID:'y'}]},options:barStopsOpts});
+  new Chart(document.getElementById("barMTBF").getContext("2d"), {type:'bar',data:{labels:labels,datasets:[{label:'MTBF (min)',data:mtbfData,backgroundColor:CHART_COLOR, yAxisID:'y'}]},options:opts("MTBF by Asset (minutes)")});
+  
+  let brc=document.getElementById("barReasons");
+  if(brc){if(reasonLabels.length > 0){new Chart(brc.getContext("2d"),{type:'bar',data:{labels:reasonLabels,datasets:[{label:'Event Count',data:reasonData,backgroundColor:CHART_COLOR, yAxisID:'y'}]},options:opts("Downtime Reason Distribution")});} else {let c=brc.getContext("2d"); c.clearRect(0,0,brc.width,brc.height); c.textAlign="center"; c.fillText("No reason data.", brc.width/2, brc.height/2);}}
+}
+
+function formatMinutesToHHMMSSCompare(val) { if (isNaN(val) || val <= 0.001) return "0:00:00"; let t = Math.round(60 * val), n = Math.floor(t / 3600), a = Math.floor(t % 3600 / 60); return t %= 60, `${n}:${a.toString().padStart(2,"0")}:${(t).toString().padStart(2,"0")}` }
+
+function renderCompareTablePage() {
+  let tableBody = document.getElementById("compareTable"); if (!tableBody) return;
+  tableBody.innerHTML = "";
+  let byAsset = {}; allAssetNamesCompare.forEach(e => { byAsset[e] = []; });
+  for (let event of allEventsCompare) { byAsset[event[2]] && byAsset[event[2]].push(event); }
+  
+  for (let assetName of allAssetNamesCompare) {
+    let assetEvents = byAsset[assetName] || [];
+    let lastEvent = assetEvents.length ? assetEvents[assetEvents.length - 1] : null;
+    let row = `<tr>
+      <td>${assetName}</td>
+      <td>${lastEvent && lastEvent[5] ? parseFloat(lastEvent[5]).toFixed(2) : "-"}</td>
+      <td>${lastEvent && lastEvent[6] ? formatMinutesToHHMMSSCompare(parseFloat(lastEvent[6])) : "-"}</td>
+      <td>${lastEvent && lastEvent[7] ? formatMinutesToHHMMSSCompare(parseFloat(lastEvent[7])) : "-"}</td>
+      <td>${lastEvent && lastEvent[10] ? parseInt(lastEvent[10], 10) : "-"}</td>
+      <td>${lastEvent && lastEvent[8] ? formatMinutesToHHMMSSCompare(parseFloat(lastEvent[8])) : "-"}</td>
+      <td>${lastEvent && lastEvent[9] ? formatMinutesToHHMMSSCompare(parseFloat(lastEvent[9])) : "-"}</td>
+    </tr>`;
+    tableBody.innerHTML += row;
   }
 }
 
-function renderCompareTablePage() { let e = document.getElementById("compareTable"); if (!e) return; e.innerHTML = ""; let t = {}; allAssetNamesCompare.forEach(e => { t[e] = [] }); for (let n of allEventsCompare) t[n[2]] && t[n[2]].push(n); for (let n of allAssetNamesCompare) { let a = t[n] || [], l = a.length ? a[a.length - 1] : null; e.innerHTML += `<tr><td>${n}</td><td>${l&&l[5]?parseFloat(l[5]).toFixed(2):"-"}</td><td>${l&&l[6]?formatMinutesToHHMMSSCompare(parseFloat(l[6])):"-"}</td><td>${l&&l[7]?formatMinutesToHHMMSSCompare(parseFloat(l[7])):"-"}</td><td>${l&&l[10]?l[10]:"-"}</td><td>${l&&l[8]?formatMinutesToHHMMSSCompare(parseFloat(l[8])):"-"}</td><td>${l&&l[9]?formatMinutesToHHMMSSCompare(parseFloat(l[9])):"-"}</td></tr>` } }
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fetchCompareDataPage) : fetchCompareDataPage();
 )rawliteral";
   html += "</script>";
-  // END OF JAVASCRIPT SECTION
   html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
-
-
 
 // ------------------------------------------------------------------------------------------------------------------------------------
 //  Events Page Function
