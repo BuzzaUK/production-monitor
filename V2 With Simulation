@@ -110,8 +110,9 @@ void saveConfig();
 void setupWiFiSmart();
 
 // =================================================================
-// --- Block 1: Simulation Globals - PASTE AT TOP OF YOUR FILE ---
+// --- Block 1: Simulation Globals 
 // =================================================================
+
 #include <vector> // --- SIM PATCH --- Add vector include for downtime reasons
 
 // --- SIM PATCH --- A structure to hold the state of one simulated asset
@@ -404,6 +405,16 @@ void saveConfig() {
   localSavePrefs.end();
 }
 
+void ensureLogFileHasHeader() {
+  if (!SPIFFS.exists(LOG_FILENAME) || SPIFFS.open(LOG_FILENAME, FILE_READ).size() == 0) {
+    File f = SPIFFS.open(LOG_FILENAME, FILE_APPEND);
+    if (f) {
+      f.println("Date,Time,AssetName,EventType,State,Availability,Runtime,Downtime,MTBF,MTTR,Stops,RunDuration,StopDuration,Note");
+      f.close();
+    }
+  }
+}
+
 void setupTime() {
   // Step 1: Start NTP to get the accurate universal time (UTC).
   // The first two arguments are temporary offsets and will be overridden by the TZ string later.
@@ -644,6 +655,7 @@ void archiveLogAndResetForShift(int endedShiftIndex, const char* endedShiftStart
             dst.close();
             SPIFFS.remove(LOG_FILENAME);
             Serial.printf("Log file archived via copy+delete workaround. Bytes copied: %u\n", (unsigned)bytesCopied);
+            ensureLogFileHasHeader();
         } else {
             Serial.println("Failed to archive log file via copy+delete workaround.");
             if (src) src.close();
@@ -771,14 +783,17 @@ void processShiftLogic() {
 
 
 // =================================================================
-// --- Block 2: Patched setup() function - REPLACE your existing one ---
+// ---  setup() function 
 // =================================================================
+
 void setup() {
   Serial.begin(115200);
   Serial.println("\n--- Device Starting (V21 Patched) ---");
 
   if (!SPIFFS.begin(true)) { Serial.println("SPIFFS.begin() failed! Halting."); return; }
   Serial.println("SPIFFS initialized.");
+
+  ensureLogFileHasHeader();
 
   if (!prefs.begin("assetmon", false)) {
       Serial.println("Global prefs.begin() failed during setup! WiFi saving might fail.");
@@ -891,7 +906,7 @@ void setup() {
   server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
   
  // =================================================================
-// --- Block 2: CORRECTED Simulation API Endpoints - PASTE IN setup() ---
+// --- Block 2:  Simulation API Endpoints 
 // =================================================================
 
 // Endpoint to START the simulation
@@ -944,8 +959,9 @@ server.on("/api/simulation/status", HTTP_GET, []() { // No arguments in the lamb
 }
 
 // =========================================================================
-// --- Block 1: Complete and Corrected loop() function - REPLACE yours ---
+// --- Block 1:  loop() function 
 // =========================================================================
+
 void loop() {
   server.handleClient();
 
@@ -1332,7 +1348,7 @@ String htmlAssetDetail(uint8_t idx) {
   html += "    <div class='card-header'><h3>Asset Detail</h3></div>";
   html += "    <div class='card-body'>";
   html += "      <h4 class='card-title'>" + assetNameStr + "</h4>";
-  html += "      <p class='card-text'><strong>GPIO Pin:</strong> " + String(config.assets[idx].pin) + "</p>";
+  html += "      <p class='card-text'><strong>Output:</strong> " + String(config.assets[idx].pin) + "</p>";
   html += "      <hr>";
   html += "      <a href='/analytics?asset=" + encodedAssetName + "' class='btn btn-primary'>View Full Analytics</a>";
   html += "      <a href='/' class='btn btn-outline-secondary'>Back to Dashboard</a>";
@@ -1346,8 +1362,9 @@ String htmlAssetDetail(uint8_t idx) {
 }
 
 // =================================================================
-// --- Block 5: Patched htmlConfig() function - REPLACE yours ---
+// --- Block 5:  htmlConfig() function 
 // =================================================================
+
 String htmlConfig() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
@@ -1417,7 +1434,7 @@ String htmlConfig() {
     if (i >= MAX_ASSETS) break;
     html += "                  <fieldset class='border p-3 mb-3 rounded bg-light-subtle'><legend class='w-auto px-2 fs-6 fw-semibold'>Asset #" + String(i + 1) + "</legend>";
     html += "                    <div class='mb-3'><label for='name" + String(i) + "' class='form-label'>Name</label><input type='text' class='form-control' id='name" + String(i) + "' name='name" + String(i) + "' value='" + String(config.assets[i].name) + "' maxlength='31' required></div>";
-    html += "                    <div><label for='pin" + String(i) + "' class='form-label'>GPIO Pin</label><input type='number' class='form-control' id='pin" + String(i) + "' name='pin" + String(i) + "' value='" + String(config.assets[i].pin) + "' min='0' max='39' required></div>";
+    html += "                    <div><label for='pin" + String(i) + "' class='form-label'>Output</label><input type='number' class='form-control' id='pin" + String(i) + "' name='pin" + String(i) + "' value='" + String(config.assets[i].pin) + "' min='0' max='39' required></div>";
     html += "                  </fieldset>";
   }
   html += "                </div></div>";
@@ -1453,7 +1470,7 @@ String htmlConfig() {
   html += "                    </div>";
   html += "                    <p class='form-text'>Define the start time for each shift (e.g., 06:00, 14:00, 22:00). Logs are archived at the detected start of a new shift.</p>";
   html += "                  </div>";
-  html += "                  <div class='d-grid gap-2 mt-4'><a href='/shiftlogs_page' class='btn btn-info btn-lg'>View Archived Shift Logs</a></div>";
+  // html += "                  <div class='d-grid gap-2 mt-4'><a href='/shiftlogs_page' class='btn btn-info btn-lg'>View Archived Shift Logs</a></div>";
   html += "                </div></div>";
   html += "              </div>";
 
@@ -2142,8 +2159,9 @@ function setupRangePickers() {
 }
 
 // =========================================================================
-// --- Block 1: Patched fetchAnalyticsData() function - REPLACE yours ---
+// --- Block 1:  fetchAnalyticsData() function 
 // =========================================================================
+
 function fetchAnalyticsData() {
   try { asset = decodeURIComponent(new URLSearchParams(window.location.search).get("asset") || ""); } catch(e) {console.error("Error decoding asset from URL", e);asset = "";}
   const assetNameElement = document.getElementById('assetNameInHeader'); if (assetNameElement) assetNameElement.textContent = asset || "None Selected";
@@ -2470,15 +2488,16 @@ void sendHtmlEventsPage() {
   );
 
   // --- Filters & controls row
-  String filterRowHtml =
-    "<div class='row g-3 align-items-end mb-3'>"
+String filterRowHtml =
+  "<div class='row g-3 align-items-end mb-3'>"
     "<div class='col-md-3'><label for='channelFilter' class='form-label'>Filter by Asset:</label><select id='channelFilter' class='form-select'><option value='ALL' selected>All Assets</option></select></div>"
     "<div class='col-md-3'><label for='stateFilter' class='form-label'>Event State:</label><select id='stateFilter' class='form-select'><option value='ALL'>All</option><option value='RUNNING'>Up / Running</option><option value='STOPPED'>Down / Stopped</option></select></div>"
     "<div class='col-md-2'><button class='btn btn-secondary w-100' id='scrollBtn' type='button' onclick='toggleScrollInhibit(this)'>Pause Scroll</button></div>"
     "<div class='col-md-2'><a href='/export_log' class='btn btn-info w-100'>Export CSV</a></div>"
+    "<div class='col-md-2'><a href='/shiftlogs_page' class='btn btn-warning w-100'>View Archive</a></div>"
     "<div class='col-md-2'><div id='eventCount' class='text-muted text-end pt-2'></div></div>"
-    "</div>";
-  server.sendContent(filterRowHtml);
+  "</div>";
+server.sendContent(filterRowHtml);
 
   // --- Table with improved headers and tooltips
   String tableHtml =
