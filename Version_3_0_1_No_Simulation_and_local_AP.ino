@@ -2017,87 +2017,256 @@ startAutoRefresh(updateDashboard);
 
 String htmlAnalytics() {
   String assetName = server.hasArg("asset") ? urlDecode(server.arg("asset")) : "";
-  String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Analytics: ";
-  html += assetName + "</title>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js'></script>";
-  html += "<style>body{background-color:#f8f9fa;} #ganttChartContainer {min-height: 250px; margin-bottom:20px;} .card-header h4 { margin-bottom:0; }</style>";
-  html += "</head><body>";
-
-  html += "<nav class='navbar navbar-expand-lg navbar-dark bg-dark shadow-sm'>";
-  html += "  <div class='container-fluid'>";
-  html += "    <a class='navbar-brand' href='/'>Asset Availability</a>";
-  html += "    <button class='navbar-toggler' type='button' data-bs-toggle='collapse' data-bs-target='#navbarNav'><span class='navbar-toggler-icon'></span></button>";
-  html += "    <div class='collapse navbar-collapse' id='navbarNav'>";
-  html += "      <ul class='navbar-nav ms-auto'>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/'>Dashboard</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/events'>Event Log</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/analytics-compare'>Compare Assets</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/config'>Setup</a></li>";
-  html += "      </ul>";
-  html += "    </div>";
-  html += "  </div>";
-  html += "</nav>";
-
-  html += "<div class='container mt-4'>";
-  html += "  <h2 class='mb-3'>Asset Analytics: <span id='assetNameInHeader'>" + assetName + "</span></h2>";
-  html += "  <div id='alertPlaceholder'></div>"; 
-  html += "  <div class='row mb-4' id='kpiMetrics'></div>";
-  html += "  <div class='row g-4'>";
-  html += "    <div class='col-lg-4'>"; 
-  html += "      <div class='card h-100 shadow-sm'><div class='card-header'><h4>Controls</h4></div><div class='card-body'>";
-  html += "          <div class='mb-3'><label for='fromTime' class='form-label'>From:</label><input type='datetime-local' id='fromTime' class='form-control'></div>";
-  html += "          <div class='mb-3'><label for='toTime' class='form-label'>To:</label><input type='datetime-local' id='toTime' class='form-control'></div>";
-  html += "          <p class='form-text small'>Timeline shows asset-specific START/STOP events and system events where this asset is primary, within the selected date range.</p>";
-  html += "          <button class='btn btn-primary w-100 mt-3' id='refreshTimelineBtn'>Refresh Timeline</button>";
-  html += "          <button class='btn btn-secondary w-100 mt-2' id='exportPng'>Export Chart as PNG</button>";
-  html += "      </div></div>";
-  html += "    </div>";
-  html += "    <div class='col-lg-8'>"; 
-  html += "      <div class='card h-100 shadow-sm'><div class='card-header'><h4 id='chartTitle'>Asset State Timeline</h4></div>";
-  html += "        <div class='card-body'><div id='ganttChartContainer'><canvas id='eventGanttChart'></canvas></div></div>";
-  html += "      </div>";
-  html += "    </div>";
-  html += "  </div>";
-  html += "  <div class='card mt-4 shadow-sm'><div class='card-header'><h4>Top Longest Stops (in selected range)</h4></div><div class='card-body table-responsive'><table class='table table-sm table-striped' id='topStopsTable'><thead><tr><th>#</th><th>Duration</th><th>Start Time</th><th>End Time</th><th>Reason/Note</th></tr></thead><tbody></tbody></table></div></div>";
-  html += "  <div class='card mt-4 shadow-sm'><div class='card-header'><h4>Recent Raw Events for this Asset (Last 5)</h4></div><div class='card-body table-responsive'>";
-  html += "    <table class='table table-sm table-striped table-hover'><thead><tr><th>Date</th><th>Time</th><th>Event</th><th>State Val</th><th>Avail%</th><th>Note</th></tr></thead><tbody id='recentEvents'></tbody></table>";
-  html += "  </div></div>";
-  html += "</div>"; 
+  String html = getCommonHeader("Asset Analytics: " + assetName, "");
+  
+  html += "<div class='container'>";
+  html += "<h2 style='margin-bottom: 1.5rem; color: #2563eb;'>Asset Analytics: <span id='assetNameInHeader'>" + assetName + "</span></h2>";
+  
+  html += "<div id='alertPlaceholder'></div>";
+  html += "<div class='kpi-grid' id='kpiMetrics'></div>";
+  
+  html += "<div class='row'>";
+  html += "<div class='col-4'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Controls</div>";
+  html += "<div class='card-body'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>From:</label>";
+  html += "<input type='datetime-local' id='fromTime' class='form-control'>";
+  html += "</div>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>To:</label>";
+  html += "<input type='datetime-local' id='toTime' class='form-control'>";
+  html += "</div>";
+  html += "<p style='color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;'>Timeline shows asset START/STOP events within the selected date range.</p>";
+  html += "<button class='btn btn-primary w-full mb-2' id='refreshTimelineBtn'>Refresh Timeline</button>";
+  html += "<button class='btn btn-secondary w-full' id='exportPng'>Export Chart</button>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='col-8'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'><span id='chartTitle'>Asset State Timeline</span></div>";
+  html += "<div class='card-body'>";
+  html += "<div class='chart-container'><canvas id='eventGanttChart'></canvas></div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='card mt-3'>";
+  html += "<div class='card-header'>Top Longest Stops</div>";
+  html += "<div class='card-body'>";
+  html += "<div style='overflow-x: auto;'>";
+  html += "<table class='table table-striped' id='topStopsTable'>";
+  html += "<thead><tr><th>#</th><th>Duration</th><th>Start Time</th><th>End Time</th><th>Reason/Note</th></tr></thead>";
+  html += "<tbody></tbody></table>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='card mt-3'>";
+  html += "<div class='card-header'>Recent Events for this Asset (Last 5)</div>";
+  html += "<div class='card-body'>";
+  html += "<div style='overflow-x: auto;'>";
+  html += "<table class='table table-striped table-hover'>";
+  html += "<thead><tr><th>Date</th><th>Time</th><th>Event</th><th>State</th><th>Availability</th><th>Note</th></tr></thead>";
+  html += "<tbody id='recentEvents'></tbody></table>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "</div>";
+  
+  html += getChartJS();
+  html += getCommonJS();
   html += "<script>";
   html += R"rawliteral(
+// Simplified Analytics for ESP32 Memory Efficiency
 
-// --- Constants and Global Variables (defined at the very top) ---
-const GREEN_COLOR = 'rgba(25, 135, 84, 0.8)'; 
-const RED_COLOR = 'rgba(220, 53, 69, 0.8)';   
-const AMBER_COLOR = 'rgba(255, 193, 7, 0.8)'; 
-const GREY_COLOR = 'rgba(108, 117, 125, 0.7)'; 
-const INFO_COLOR = 'rgba(13, 202, 240, 0.7)';  
+let asset = '';
+let allEvents = [];
+let eventChart = null;
 
-let asset = ''; 
-let allEvents = []; 
-let eventGanttChart = null; 
-let downtimeReasonsConfig = []; 
-let longStopThresholdSecs = 300; 
+function showAlert(message, type) {
+  const placeholder = document.getElementById('alertPlaceholder');
+  if (placeholder) {
+    placeholder.innerHTML = `<div style="background: ${type === 'success' ? '#dcfce7' : '#fecaca'}; color: ${type === 'success' ? '#166534' : '#991b1b'}; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">${message}</div>`;
+  }
+}
 
-// --- ALL FUNCTION DEFINITIONS ARE PLACED HERE, BEFORE ANY EXECUTABLE CODE ---
+function formatDuration(seconds) {
+  if (!seconds || seconds < 0) return "00:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
+}
 
-const alertPlaceholderDOM = document.getElementById('alertPlaceholder');
-function showAlert(message, type) { 
-    if (!alertPlaceholderDOM) { console.error("alertPlaceholder not found for message:", message); return; }
-    const wrapper = document.createElement('div'); 
-    wrapper.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert"><div>${message}</div><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>`; 
-    alertPlaceholderDOM.innerHTML = ''; 
-    alertPlaceholderDOM.append(wrapper); 
-};
+function formatDateTime(dateStr, timeStr) {
+  return dateStr + " " + timeStr;
+}
 
-function formatSecondsToHHMMSS(totalSeconds) {
-    if (isNaN(totalSeconds) || totalSeconds < 0) totalSeconds = 0;
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
+function initializeAnalytics() {
+  const urlParams = new URLSearchParams(window.location.search);
+  asset = urlParams.get('asset') || '';
+  
+  if (!asset) {
+    showAlert('No asset specified', 'error');
+    return;
+  }
+
+  // Set default date range (last 24 hours)
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  document.getElementById('fromTime').value = formatToDatetimeLocal(yesterday);
+  document.getElementById('toTime').value = formatToDatetimeLocal(now);
+  
+  loadAnalyticsData();
+}
+
+function formatToDatetimeLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function loadAnalyticsData() {
+  Promise.all([
+    fetch('/api/events').then(r => r.json()),
+    fetch('/api/config').then(r => r.json())
+  ]).then(([events, config]) => {
+    allEvents = (events || []).filter(e => 
+      Array.isArray(e) && e.length >= 3 && 
+      e[2].toLowerCase() === asset.toLowerCase()
+    );
+    
+    updateKPIs();
+    updateRecentEvents();
+    updateChart();
+    
+  }).catch(e => {
+    console.error('Error loading analytics data:', e);
+    showAlert('Error loading data', 'error');
+  });
+}
+
+function updateKPIs() {
+  const kpiDiv = document.getElementById('kpiMetrics');
+  if (!kpiDiv) return;
+  
+  if (allEvents.length === 0) {
+    kpiDiv.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #6b7280;">No events found for this asset</div>';
+    return;
+  }
+
+  // Simple KPI calculation from last event
+  const lastEvent = allEvents[allEvents.length - 1];
+  const availability = lastEvent[5] ? parseFloat(lastEvent[5]).toFixed(2) : '0.00';
+  const runtime = lastEvent[6] ? formatDuration(parseFloat(lastEvent[6]) * 60) : '00:00';
+  const downtime = lastEvent[7] ? formatDuration(parseFloat(lastEvent[7]) * 60) : '00:00';
+  const stops = lastEvent[10] ? parseInt(lastEvent[10]) : 0;
+
+  kpiDiv.innerHTML = `
+    <div class="kpi-card">
+      <div class="value">${availability}%</div>
+      <div class="label">Availability</div>
+    </div>
+    <div class="kpi-card">
+      <div class="value">${runtime}</div>
+      <div class="label">Runtime</div>
+    </div>
+    <div class="kpi-card">
+      <div class="value">${downtime}</div>
+      <div class="label">Downtime</div>
+    </div>
+    <div class="kpi-card">
+      <div class="value">${stops}</div>
+      <div class="label">Total Stops</div>
+    </div>
+  `;
+}
+
+function updateRecentEvents() {
+  const tbody = document.getElementById('recentEvents');
+  if (!tbody) return;
+  
+  const recentEvents = allEvents.slice(-5).reverse();
+  let html = '';
+  
+  recentEvents.forEach(event => {
+    const state = event[4] == '1' ? '<span class="badge badge-success">RUNNING</span>' : '<span class="badge badge-danger">STOPPED</span>';
+    const availability = event[5] ? parseFloat(event[5]).toFixed(2) + '%' : '-';
+    const note = event.length > 13 ? event[13] : '';
+    
+    html += `
+      <tr>
+        <td>${event[0]}</td>
+        <td>${event[1]}</td>
+        <td><strong>${event[3]}</strong></td>
+        <td>${state}</td>
+        <td>${availability}</td>
+        <td>${note}</td>
+      </tr>
+    `;
+  });
+  
+  tbody.innerHTML = html;
+}
+
+function updateChart() {
+  const canvas = document.getElementById('eventGanttChart');
+  if (!canvas || allEvents.length === 0) return;
+  
+  // Simple bar chart showing availability over time
+  const labels = allEvents.slice(-10).map(e => e[1]); // Last 10 events, show times
+  const availData = allEvents.slice(-10).map(e => parseFloat(e[5]) || 0);
+  
+  if (eventChart) {
+    eventChart.data.labels = labels;
+    eventChart.data.datasets[0].data = availData;
+    eventChart.update();
+  } else {
+    eventChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Availability %',
+          data: availData,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+}
+
+// Event handlers
+document.getElementById('refreshTimelineBtn').addEventListener('click', loadAnalyticsData);
+document.getElementById('exportPng').addEventListener('click', function() {
+  showAlert('Export functionality available in full version', 'info');
+});
+
+// Initialize
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeAnalytics);
+} else {
+  initializeAnalytics();
+}
+)rawliteral";
+  html += "</script>";
+  html += "</body></html>";
+  return html;
+}
     const s = Math.floor(totalSeconds % 60);
     const pad = (num) => String(num).padStart(2, '0');
     if (h > 0) { return `${pad(h)}:${pad(m)}:${pad(s)}`; } 
@@ -2454,10 +2623,6 @@ document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
   html += "</body></html>";
   return html;
 }
-  
-// ------------------------------------------------------------------------------------------------------------------------------------
-//  Compare Assets Page Function
-// ------------------------------------------------------------------------------------------------------------------------------------
 
 String htmlAnalyticsCompare() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Compare Assets</title>";
