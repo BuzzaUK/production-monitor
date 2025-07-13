@@ -118,6 +118,10 @@ String htmlAnalytics();
 String htmlAnalyticsCompare();
 String htmlConfig();
 void sendHtmlEventsPage();
+String getCommonCSS();
+String getCommonJS();
+String getChartJS();
+String getCommonHeader(const String& pageTitle, const String& activeNavItem = "");
 String wifiConfigHTML();
 String htmlAssetDetail(uint8_t idx);
 void handleConfigPost();
@@ -1177,6 +1181,452 @@ String urlDecode(const String& str) {
 }
 
 
+// ===================================================================
+// COMMON UI FRAMEWORK - UNIFIED STYLING FOR ALL PAGES
+// ===================================================================
+
+String getCommonCSS() {
+  return R"rawliteral(
+<style>
+/* Asset Availability Monitor - Unified CSS Framework */
+* { box-sizing: border-box; }
+body { 
+  font-family: Arial, Helvetica, sans-serif; 
+  margin: 0; 
+  padding: 0; 
+  background: #f5f7fa; 
+  color: #333; 
+}
+
+/* Header and Navigation */
+.header { 
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+  color: white; 
+  padding: 1rem 0; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+}
+.header-content { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 0 1rem; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  flex-wrap: wrap; 
+}
+.header h1 { 
+  margin: 0; 
+  font-size: 1.5rem; 
+  font-weight: 600; 
+}
+.nav { 
+  display: flex; 
+  gap: 0.5rem; 
+  flex-wrap: wrap; 
+}
+.nav a { 
+  color: white; 
+  text-decoration: none; 
+  padding: 0.5rem 1rem; 
+  border-radius: 4px; 
+  transition: background 0.3s; 
+  font-size: 0.9rem; 
+}
+.nav a:hover, .nav a.active { 
+  background: rgba(255,255,255,0.2); 
+}
+
+/* Main Content */
+.container { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 1.5rem 1rem; 
+}
+.card { 
+  background: white; 
+  border-radius: 8px; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+  margin-bottom: 1.5rem; 
+  overflow: hidden; 
+}
+.card-header { 
+  background: #f8f9fa; 
+  border-bottom: 1px solid #e9ecef; 
+  padding: 1rem 1.5rem; 
+  font-weight: 600; 
+  font-size: 1.1rem; 
+}
+.card-body { 
+  padding: 1.5rem; 
+}
+
+/* Buttons */
+.btn { 
+  display: inline-block; 
+  padding: 0.5rem 1rem; 
+  border: none; 
+  border-radius: 4px; 
+  text-decoration: none; 
+  cursor: pointer; 
+  font-size: 0.9rem; 
+  font-weight: 500; 
+  transition: all 0.3s; 
+  text-align: center; 
+}
+.btn-primary { 
+  background: #2563eb; 
+  color: white; 
+}
+.btn-primary:hover { 
+  background: #1d4ed8; 
+}
+.btn-secondary { 
+  background: #6b7280; 
+  color: white; 
+}
+.btn-secondary:hover { 
+  background: #4b5563; 
+}
+.btn-success { 
+  background: #10b981; 
+  color: white; 
+}
+.btn-danger { 
+  background: #ef4444; 
+  color: white; 
+}
+.btn-outline { 
+  background: transparent; 
+  color: #2563eb; 
+  border: 1px solid #2563eb; 
+}
+.btn-outline:hover { 
+  background: #2563eb; 
+  color: white; 
+}
+.btn-sm { 
+  padding: 0.25rem 0.5rem; 
+  font-size: 0.8rem; 
+}
+
+/* Tables */
+.table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  margin: 0; 
+}
+.table th, .table td { 
+  padding: 0.75rem; 
+  text-align: left; 
+  border-bottom: 1px solid #e5e7eb; 
+}
+.table th { 
+  background: #f9fafb; 
+  font-weight: 600; 
+  color: #374151; 
+}
+.table-striped tbody tr:nth-child(even) { 
+  background: #f9fafb; 
+}
+.table-hover tbody tr:hover { 
+  background: #f3f4f6; 
+}
+
+/* Status Badges */
+.badge { 
+  display: inline-block; 
+  padding: 0.25rem 0.5rem; 
+  font-size: 0.75rem; 
+  font-weight: 600; 
+  border-radius: 4px; 
+  text-transform: uppercase; 
+}
+.badge-success { 
+  background: #dcfce7; 
+  color: #166534; 
+}
+.badge-danger { 
+  background: #fecaca; 
+  color: #991b1b; 
+}
+.badge-warning { 
+  background: #fef3c7; 
+  color: #92400e; 
+}
+.badge-info { 
+  background: #dbeafe; 
+  color: #1e40af; 
+}
+
+/* Forms */
+.form-group { 
+  margin-bottom: 1rem; 
+}
+.form-label { 
+  display: block; 
+  margin-bottom: 0.5rem; 
+  font-weight: 500; 
+  color: #374151; 
+}
+.form-control { 
+  width: 100%; 
+  padding: 0.5rem; 
+  border: 1px solid #d1d5db; 
+  border-radius: 4px; 
+  font-size: 0.9rem; 
+}
+.form-control:focus { 
+  outline: none; 
+  border-color: #2563eb; 
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); 
+}
+
+/* Grid System */
+.row { 
+  display: flex; 
+  flex-wrap: wrap; 
+  margin: -0.5rem; 
+}
+.col { 
+  flex: 1; 
+  padding: 0.5rem; 
+}
+.col-1 { flex: 0 0 8.333%; }
+.col-2 { flex: 0 0 16.666%; }
+.col-3 { flex: 0 0 25%; }
+.col-4 { flex: 0 0 33.333%; }
+.col-6 { flex: 0 0 50%; }
+.col-8 { flex: 0 0 66.666%; }
+.col-12 { flex: 0 0 100%; }
+
+/* Charts */
+.chart-container { 
+  position: relative; 
+  height: 300px; 
+  margin: 1rem 0; 
+}
+
+/* Status Cards */
+.status-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+  gap: 1rem; 
+  margin-bottom: 1.5rem; 
+}
+.status-card { 
+  background: white; 
+  border-radius: 8px; 
+  padding: 1rem; 
+  text-align: center; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+  border-left: 4px solid #2563eb; 
+}
+.status-card.running { 
+  border-left-color: #10b981; 
+}
+.status-card.stopped { 
+  border-left-color: #ef4444; 
+}
+.status-card h3 { 
+  margin: 0 0 0.5rem 0; 
+  font-size: 2rem; 
+  font-weight: 700; 
+}
+.status-card p { 
+  margin: 0; 
+  color: #6b7280; 
+  font-size: 0.9rem; 
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-content { 
+    flex-direction: column; 
+    text-align: center; 
+  }
+  .nav { 
+    margin-top: 1rem; 
+    justify-content: center; 
+  }
+  .container { 
+    padding: 1rem 0.5rem; 
+  }
+  .row { 
+    flex-direction: column; 
+  }
+  .col { 
+    flex: none; 
+  }
+  .table { 
+    font-size: 0.8rem; 
+  }
+  .table th, .table td { 
+    padding: 0.5rem 0.25rem; 
+  }
+}
+
+/* Event Log Specific */
+.legend { 
+  display: flex; 
+  gap: 1rem; 
+  margin-bottom: 1rem; 
+  flex-wrap: wrap; 
+}
+.legend-item { 
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem; 
+}
+.legend-dot { 
+  width: 12px; 
+  height: 12px; 
+  border-radius: 50%; 
+}
+.legend-start { background: #10b981; }
+.legend-stop { background: #ef4444; }
+.legend-system { background: #2563eb; }
+
+/* Analytics Specific */
+.kpi-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+  gap: 1rem; 
+  margin-bottom: 1.5rem; 
+}
+.kpi-card { 
+  background: white; 
+  border-radius: 8px; 
+  padding: 1rem; 
+  text-align: center; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+}
+.kpi-card .value { 
+  font-size: 1.5rem; 
+  font-weight: 700; 
+  color: #2563eb; 
+}
+.kpi-card .label { 
+  color: #6b7280; 
+  font-size: 0.9rem; 
+}
+
+/* Config Page Specific */
+.config-section { 
+  margin-bottom: 2rem; 
+}
+.config-section h3 { 
+  color: #2563eb; 
+  border-bottom: 2px solid #e5e7eb; 
+  padding-bottom: 0.5rem; 
+  margin-bottom: 1rem; 
+}
+.asset-config { 
+  background: #f9fafb; 
+  border: 1px solid #e5e7eb; 
+  border-radius: 6px; 
+  padding: 1rem; 
+  margin-bottom: 1rem; 
+}
+.asset-config h4 { 
+  margin: 0 0 1rem 0; 
+  color: #374151; 
+}
+
+/* Utilities */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.d-flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.align-center { align-items: center; }
+.w-full { width: 100%; }
+.hidden { display: none; }
+</style>
+)rawliteral";
+}
+
+String getChartJS() {
+  // Minimal Chart.js embedded - essential functionality only for ESP32 memory efficiency
+  return R"rawliteral(
+<script>
+!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(e="undefined"!=typeof globalThis?globalThis:e||self).Chart=t()}(this,function(){"use strict";const e=4,t=()=>Math.trunc(1e7*Math.random()),n=new Map;function i(t,n){const i=e.toString(16),r=t.toString(16),o=n.toString(16);return`#${i}${r}${o}`}const r=["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#84cc16","#f97316","#ec4899","#6366f1"];class Chart{constructor(e,t){if(this.ctx=e.getContext("2d"),this.canvas=e,this.config=t,this.data=t.data||{},this.options=t.options||{},this.type=t.type||"bar",this.destroyed=!1,this.plugins=[],this.scales={},this.legend=null,!this.ctx)throw new Error("Failed to create chart: can't acquire context from the given element");this.initialize()}initialize(){this.bindEvents(),this.resize(),this.draw()}resize(){const e=this.canvas.parentNode;if(e){const t=e.offsetWidth,n=e.offsetHeight;this.canvas.width=t,this.canvas.height=n}}bindEvents(){this.canvas.addEventListener("click",e=>{this.onClick(e)})}onClick(e){const t=this.canvas.getBoundingClientRect(),n=e.clientX-t.left,i=e.clientY-t.top;console.log("Chart clicked at:",n,i)}draw(){if(this.destroyed)return;const e=this.ctx,t=this.canvas.width,n=this.canvas.height;e.clearRect(0,0,t,n),e.fillStyle="#ffffff",e.fillRect(0,0,t,n);const i={top:40,right:20,bottom:60,left:60},o=t-i.left-i.right,s=n-i.top-i.bottom;if("bar"===this.type)this.drawBar(e,i,o,s);else if("line"===this.type)this.drawLine(e,i,o,s);else if("doughnut"===this.type||"pie"===this.type)this.drawDoughnut(e,i,o,s)}drawBar(e,t,n,i){const o=this.data.labels||[],s=this.data.datasets||[],a=o.length;if(0===a||0===s.length)return;let l=0;s.forEach(e=>{e.data&&e.data.forEach(e=>{l=Math.max(l,e||0)})});const c=n/a,h=i/l;e.fillStyle="#e5e7eb",e.fillRect(t.left,t.top,n,i);const u=s.length,d=c/(u+1);s.forEach((o,s)=>{const a=o.backgroundColor||r[s%r.length];e.fillStyle=a,o.data&&o.data.forEach((r,o)=>{if(null!=r&&!isNaN(r)){const a=r*h,l=t.left+o*c+s*d+d/2,u=t.top+i-a;e.fillRect(l,u,d*.8,a)}})});e.strokeStyle="#374151",e.lineWidth=1,e.strokeRect(t.left,t.top,n,i);for(let r=0;r<=5;r++){const o=i/5*r,s=l/5*(5-r);e.strokeStyle="#d1d5db",e.lineWidth=.5,e.beginPath(),e.moveTo(t.left,t.top+o),e.lineTo(t.left+n,t.top+o),e.stroke(),e.fillStyle="#6b7280",e.font="12px Arial",e.textAlign="right",e.fillText(Math.round(s).toString(),t.left-5,t.top+o+4)}o.forEach((n,i)=>{e.fillStyle="#6b7280",e.font="12px Arial",e.textAlign="center",e.fillText(n,t.left+i*c+c/2,t.top+this.canvas.height-t.bottom+15)})}drawLine(e,t,n,i){const o=this.data.labels||[],s=this.data.datasets||[],a=o.length;if(0===a||0===s.length)return;let l=0,c=1/0;s.forEach(e=>{e.data&&e.data.forEach(e=>{null!=e&&!isNaN(e)&&(l=Math.max(l,e),c=Math.min(c,e))})});c=Math.min(c,0);const h=n/(a-1||1),u=i/(l-c||1);e.fillStyle="#e5e7eb",e.fillRect(t.left,t.top,n,i),s.forEach((o,s)=>{const a=o.borderColor||o.backgroundColor||r[s%r.length];if(e.strokeStyle=a,e.lineWidth=2,e.beginPath(),o.data){let s=!0;o.data.forEach((r,o)=>{if(null!=r&&!isNaN(r)){const a=t.left+o*h,l=t.top+i-(r-c)*u;s?(e.moveTo(a,l),s=!1):e.lineTo(a,l)}})}}),e.stroke();for(let r=0;r<=5;r++){const o=i/5*r,s=c+(l-c)/5*(5-r);e.strokeStyle="#d1d5db",e.lineWidth=.5,e.beginPath(),e.moveTo(t.left,t.top+o),e.lineTo(t.left+n,t.top+o),e.stroke(),e.fillStyle="#6b7280",e.font="12px Arial",e.textAlign="right",e.fillText(s.toFixed(1),t.left-5,t.top+o+4)}o.forEach((n,i)=>{e.fillStyle="#6b7280",e.font="12px Arial",e.textAlign="center",e.fillText(n,t.left+i*h,t.top+this.canvas.height-t.bottom+15)})}drawDoughnut(e,t,n,i){const o=this.data.datasets||[],s=o[0]?.data||[];if(0===s.length)return;const a=s.reduce((e,t)=>e+(t||0),0);if(0===a)return;const l=Math.min(n,i)/2*.8,c=t.left+n/2,h=t.top+i/2;let u=0;s.forEach((t,n)=>{if(t){const i=t/a*2*Math.PI,s=o[0]?.backgroundColor?.[n]||r[n%r.length];e.fillStyle=s,e.beginPath(),e.moveTo(c,h),e.arc(c,h,l,u,u+i),e.closePath(),e.fill(),u+=i}})}update(){this.resize(),this.draw()}destroy(){this.destroyed=!0,n.delete(this.canvas)}}Chart.register=function(){},Chart.defaults={responsive:!0,maintainAspectRatio:!1,plugins:{legend:{display:!0}}};return Chart});
+</script>
+)rawliteral";
+}
+
+String getCommonHeader(const String& pageTitle, const String& activeNavItem) {
+  String html = "<!DOCTYPE html><html lang='en'><head>";
+  html += "<meta charset='UTF-8'>";
+  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+  html += "<title>" + pageTitle + " - Asset Availability Monitor</title>";
+  html += getCommonCSS();
+  html += "</head><body>";
+  
+  // Header
+  html += "<div class='header'>";
+  html += "<div class='header-content'>";
+  html += "<h1>Asset Availability Monitor</h1>";
+  html += "<nav class='nav'>";
+  html += "<a href='/' " + (activeNavItem == "dashboard" ? "class='active'" : "") + ">Dashboard</a>";
+  html += "<a href='/events' " + (activeNavItem == "events" ? "class='active'" : "") + ">Event Log</a>";
+  html += "<a href='/analytics-compare' " + (activeNavItem == "compare" ? "class='active'" : "") + ">Compare Assets</a>";
+  html += "<a href='/config' " + (activeNavItem == "config" ? "class='active'" : "") + ">Setup</a>";
+  html += "</nav>";
+  html += "</div>";
+  html += "</div>";
+  
+  return html;
+}
+
+String getCommonJS() {
+  return R"rawliteral(
+<script>
+// Common JavaScript utilities
+function formatDuration(minutes) {
+  if (!minutes || minutes < 0.01) return "00:00:00";
+  const totalSeconds = Math.round(minutes * 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return (hours < 10 ? "0" : "") + hours + ":" + 
+         (mins < 10 ? "0" : "") + mins + ":" + 
+         (secs < 10 ? "0" : "") + secs;
+}
+
+function formatNumber(num, decimals = 2) {
+  return parseFloat(num).toFixed(decimals);
+}
+
+function updateTimestamp() {
+  const elements = document.querySelectorAll('.last-updated');
+  const now = new Date().toLocaleTimeString();
+  elements.forEach(el => el.textContent = `Last updated: ${now}`);
+}
+
+// Auto-refresh functionality
+let refreshInterval = null;
+function startAutoRefresh(callback, intervalMs = 5000) {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(callback, intervalMs);
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+</script>
+)rawliteral";
+}
+
 // HTML Functions
 
 String htmlAssetDetail(uint8_t idx) {
@@ -1185,35 +1635,25 @@ String htmlAssetDetail(uint8_t idx) {
   }
 
   String assetNameStr = String(config.assets[idx].name);
-  String encodedAssetName = urlEncode(assetNameStr); // Ensure name is URL-safe for the link
+  String encodedAssetName = urlEncode(assetNameStr);
 
-  String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Detail: " + assetNameStr + "</title>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<style>body{background-color:#f8f9fa;}</style>";
-  html += "</head><body>";
-
-  // --- Standard Bootstrap Navbar ---
-  html += "<nav class='navbar navbar-expand-lg navbar-dark bg-dark shadow-sm'>";
-  html += "  <div class='container-fluid'>";
-  html += "    <a class='navbar-brand' href='/'>Asset Availability</a>";
-  html += "    <div class='ms-auto'><a href='/' class='btn btn-secondary'>Back to Dashboard</a></div>";
-  html += "  </div></nav>";
-
-  html += "<div class='container mt-4'>";
-  html += "  <div class='card shadow-sm'>";
-  html += "    <div class='card-header'><h3>Asset Detail</h3></div>";
-  html += "    <div class='card-body'>";
-  html += "      <h4 class='card-title'>" + assetNameStr + "</h4>";
-  html += "      <p class='card-text'><strong>Output:</strong> " + String(config.assets[idx].pin) + "</p>";
-  html += "      <hr>";
-  html += "      <a href='/analytics?asset=" + encodedAssetName + "' class='btn btn-primary'>View Full Analytics</a>";
-  html += "      <a href='/' class='btn btn-outline-secondary'>Back to Dashboard</a>";
-  html += "    </div>";
-  html += "  </div>";
+  String html = getCommonHeader("Asset Detail: " + assetNameStr, "");
+  
+  html += "<div class='container'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Asset Detail</div>";
+  html += "<div class='card-body'>";
+  html += "<h2 style='margin-bottom: 1rem; color: #2563eb;'>" + assetNameStr + "</h2>";
+  html += "<p><strong>GPIO Pin:</strong> " + String(config.assets[idx].pin) + "</p>";
+  html += "<div style='margin-top: 2rem;'>";
+  html += "<a href='/analytics?asset=" + encodedAssetName + "' class='btn btn-primary' style='margin-right: 1rem;'>View Full Analytics</a>";
+  html += "<a href='/' class='btn btn-secondary'>Back to Dashboard</a>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
   html += "</div>";
 
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += getCommonJS();
   html += "</body></html>";
   return html;
 }
@@ -1223,330 +1663,354 @@ String htmlAssetDetail(uint8_t idx) {
 // =================================================================
 
 String htmlConfig() {
-  String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<style>";
-  html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}";
-  html += "header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001; font-size:1.6em; font-weight:700;}";
-  html += ".nav{display:flex;justify-content:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;align-items:center;}";
-  html += ".nav button, .nav a {text-decoration:none;background:#fff;color:#1976d2;border:1px solid #1976d2;border-radius:6px;padding:0.7em 1.1em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px #0001;cursor:pointer;margin:0.2em 0.4em;}";
-  html += ".nav button:hover, .nav a:hover {background:#e3f0fc;}";
-  html += ".nav .right{margin-left:auto;}";
-  html += ".main{max-width:700px;margin:1rem auto;padding:1rem;}";
-  html += ".card{background:#fff;border-radius:10px;box-shadow:0 2px 16px #0002;margin-bottom:1.3rem;padding:1.3rem;}";
-  html += "label.form-label{font-weight:500;margin-top:1em;display:block;}";
-  html += "input.form-control[type=text],input.form-control[type=number],select.form-select{width:100%;padding:0.6em;margin-top:0.2em;margin-bottom:1em;border:1px solid #ccc;border-radius:5px;font-size:1em;}";
-  html += "button.btn-primary, input.btn-primary[type=submit]{width:100%;margin-top:1em;padding:0.8em 1.5em;font-size:1.15em;font-weight:700;}";
-  html += ".notice{background:#e6fbe7;color:#256029;font-weight:bold;padding:0.6em 1em;border-radius:7px;margin-bottom:1em;text-align:center;}";
-  html += ".accordion-button:not(.collapsed){color: #0c63e4; background-color: #e7f1ff;}";
-  html += ".accordion-button:focus {box-shadow: 0 0 0 .25rem rgba(13,110,253,.25);}";
-  html += "</style>";
-  html += "</head><body>";
-  html += "<nav class='navbar navbar-expand-lg navbar-dark bg-dark shadow-sm'>";
-  html += "  <div class='container-fluid'>";
-  html += "    <a class='navbar-brand' href='/'>Asset Availability</a>";
-  html += "    <button class='navbar-toggler' type='button' data-bs-toggle='collapse' data-bs-target='#navbarNav'><span class='navbar-toggler-icon'></span></button>";
-  html += "    <div class='collapse navbar-collapse' id='navbarNav'>";
-  html += "      <ul class='navbar-nav ms-auto'>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/'>Dashboard</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/events'>Event Log</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/analytics-compare'>Compare Assets</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link active' href='/config'>Setup</a></li>";
-  html += "      </ul>";
-  html += "    </div>";
-  html += "  </div>";
-  html += "</nav>";
-  html += "<div class='container mt-4'>";
-  html += "  <div class='row justify-content-center'>";
-  html += "    <div class='col-lg-9 col-xl-8'>";
-
-  html += "      <div class='card shadow-sm'>";
-  html += "        <div class='card-header bg-light'><h3 class='mb-0'>Configuration</h3></div>";
-  html += "        <div class='card-body'>";
-  html += "          <div id='saveNotice' class='alert alert-success' style='display:none;'>Settings saved! Device is rebooting...</div>";
-  html += "          <form method='POST' action='/save_config' id='setupform' onsubmit='setTimeout(() => { const notice = document.getElementById(\"saveNotice\"); if(notice) notice.style.display=\"block\"; }, 500);'>";
-  html += "            <div class='accordion' id='configAccordion'>";
+  String html = getCommonHeader("Setup", "config");
   
-  html += "              <div class='accordion-item'>";
-  html += "                <h2 class='accordion-header' id='headingAssets'><button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseAssets' aria-expanded='false' aria-controls='collapseAssets'>Asset Setup</button></h2>";
-  html += "                <div id='collapseAssets' class='accordion-collapse collapse' aria-labelledby='headingAssets' data-bs-parent='#configAccordion'><div class='accordion-body'>";
-  html += "                  <div class='mb-3'><label for='assetCountField' class='form-label'>Asset Count (1-" + String(MAX_ASSETS) + ")</label><input type='number' class='form-control' id='assetCountField' name='assetCount' min='1' max='" + String(MAX_ASSETS) + "' value='" + String(config.assetCount) + "' required></div>";
-  html += "                  <p class='form-text'>After changing asset count, 'Save All Settings & Reboot'. The page will then update to show fields for each asset.</p>";
+  html += "<div class='container'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Configuration</div>";
+  html += "<div class='card-body'>";
+  
+  html += "<div id='saveNotice' class='hidden' style='background: #dcfce7; color: #166534; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; text-align: center; font-weight: 600;'>Settings saved! Device is rebooting...</div>";
+  
+  html += "<form method='POST' action='/save_config' id='setupform'>";
+  
+  // Asset Setup Section
+  html += "<div class='config-section'>";
+  html += "<h3>Asset Setup</h3>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Asset Count (1-" + String(MAX_ASSETS) + ")</label>";
+  html += "<input type='number' class='form-control' name='assetCount' min='1' max='" + String(MAX_ASSETS) + "' value='" + String(config.assetCount) + "' required>";
+  html += "</div>";
+  html += "<p style='color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;'>After changing asset count, save settings and reboot. The page will then update to show fields for each asset.</p>";
+  
   for (uint8_t i = 0; i < config.assetCount; ++i) {
     if (i >= MAX_ASSETS) break;
-    html += "                  <fieldset class='border p-3 mb-3 rounded bg-light-subtle'><legend class='w-auto px-2 fs-6 fw-semibold'>Asset #" + String(i + 1) + "</legend>";
-    html += "                    <div class='mb-3'><label for='name" + String(i) + "' class='form-label'>Name</label><input type='text' class='form-control' id='name" + String(i) + "' name='name" + String(i) + "' value='" + String(config.assets[i].name) + "' maxlength='31' required></div>";
-    html += "                    <div><label for='pin" + String(i) + "' class='form-label'>Output</label><input type='number' class='form-control' id='pin" + String(i) + "' name='pin" + String(i) + "' value='" + String(config.assets[i].pin) + "' min='0' max='39' required></div>";
-    html += "                  </fieldset>";
+    html += "<div class='asset-config'>";
+    html += "<h4>Asset #" + String(i + 1) + "</h4>";
+    html += "<div class='row'>";
+    html += "<div class='col-6'>";
+    html += "<div class='form-group'>";
+    html += "<label class='form-label'>Name</label>";
+    html += "<input type='text' class='form-control' name='name" + String(i) + "' value='" + String(config.assets[i].name) + "' maxlength='31' required>";
+    html += "</div>";
+    html += "</div>";
+    html += "<div class='col-6'>";
+    html += "<div class='form-group'>";
+    html += "<label class='form-label'>GPIO Pin</label>";
+    html += "<input type='number' class='form-control' name='pin" + String(i) + "' value='" + String(config.assets[i].pin) + "' min='0' max='39' required>";
+    html += "</div>";
+    html += "</div>";
+    html += "</div>";
+    html += "</div>";
   }
-  html += "                </div></div>";
-  html += "              </div>";
-
-  html += "              <div class='accordion-item'>";
-  html += "                <h2 class='accordion-header' id='headingOps'><button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseOps' aria-expanded='false' aria-controls='collapseOps'>Operational Settings</button></h2>";
-  html += "                <div id='collapseOps' class='accordion-collapse collapse' aria-labelledby='headingOps' data-bs-parent='#configAccordion'><div class='accordion-body'>";
-  html += "                  <div class='mb-3'><label for='maxEvents' class='form-label'>Max Events in Log</label><input type='number' id='maxEvents' class='form-control' name='maxEvents' min='100' max='5000' value='" + String(config.maxEvents) + "' required></div>";
-  html += "                  <div class='mb-3'><label for='tzOffset' class='form-label'>Timezone Offset (hours from UTC)</label><input type='number' id='tzOffset' class='form-control' name='tzOffset' min='-12' max='14' step='0.5' value='" + String(config.tzOffset / 3600.0, 1) + "' required></div>";
-  html += "                  <div class='mb-3'><label for='longStopThreshold' class='form-label'>Highlight Stops Longer Than (minutes)</label><input type='number' id='longStopThreshold' class='form-control' name='longStopThreshold' min='1' max='1440' value='" + String(config.longStopThresholdSec/60) + "' required></div>";
-  html += "                  <div><label for='monitoringMode' class='form-label'>Monitoring Mode</label><select id='monitoringMode' name='monitoringMode' class='form-select'>";
-  html += "                    <option value='" + String(MONITORING_MODE_PARALLEL) + "'" + (config.monitoringMode == MONITORING_MODE_PARALLEL ? " selected" : "") + ">Parallel (Assets Independent)</option>";
-  html += "                    <option value='" + String(MONITORING_MODE_SERIAL) + "'" + (config.monitoringMode == MONITORING_MODE_SERIAL ? " selected" : "") + ">Serial (System Stops if Any Asset Stops)</option>";
-  html += "                  </select></div>";
-  html += "                </div></div>";
-  html += "              </div>";
-  
-  html += "              <div class='accordion-item'>";
-  html += "                <h2 class='accordion-header' id='headingShifts'><button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseShifts' aria-expanded='false' aria-controls='collapseShifts'>Production Data & Shift Setup</button></h2>";
-  html += "                <div id='collapseShifts' class='accordion-collapse collapse' aria-labelledby='headingShifts' data-bs-parent='#configAccordion'><div class='accordion-body'>";
-  html += "                  <div class='form-check mb-3'><input class='form-check-input' type='checkbox' name='enableShiftArchiving' id='enableShiftArchiving' value='1'" + String(config.enableShiftArchiving ? " checked" : "") + " onchange='toggleShiftSettingsDisplay(this.checked)'><label class='form-check-label' for='enableShiftArchiving'>Enable Automatic Log Archival & Clearing per Shift</label></div>";
-  html += "                  <div id='shiftSettingsBlockGlobal'" + String(config.enableShiftArchiving ? "" : " style='display:none;'") +">";
-  html += "                    <div class='mb-3'><label for='numShiftsInput' class='form-label'>Number of Shifts (1-" + String(MAX_CONFIGURABLE_SHIFTS) + ")</label><input type='number' class='form-control' name='numShifts' id='numShiftsInput' min='1' max='" + String(MAX_CONFIGURABLE_SHIFTS) + "' value='" + String(config.numShifts > 0 ? config.numShifts : 1) + "' oninput='renderShiftTimeInputs(this.value)'></div>";
-  html += "                    <div id='shiftTimeInputsContainer'>";
-  if (config.enableShiftArchiving) {
-    for(uint8_t i = 0; i < config.numShifts; ++i) {
-      if (i < MAX_CONFIGURABLE_SHIFTS) {
-        html += "                    <div class='mb-3'><label for='shiftStartTime" + String(i) + "' class='form-label'>Shift " + String(i + 1) + " Start Time (HH:MM)</label><input type='time' class='form-control' id='shiftStartTime" + String(i) + "' name='shiftStartTime" + String(i) + "' value='" + String(config.shifts[i].startTime) + "' required></div>";
-      }
-    }
-  }
-  html += "                    </div>";
-  html += "                    <p class='form-text'>Define the start time for each shift (e.g., 06:00, 14:00, 22:00). Logs are archived at the detected start of a new shift.</p>";
-  html += "                  </div>";
-  // html += "                  <div class='d-grid gap-2 mt-4'><a href='/shiftlogs_page' class='btn btn-info btn-lg'>View Archived Shift Logs</a></div>";
-  html += "                </div></div>";
-  html += "              </div>";
-
-  html += "              <div class='accordion-item'>";
-  html += "                <h2 class='accordion-header' id='headingReasons'><button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseReasons' aria-expanded='false' aria-controls='collapseReasons'>Downtime Quick Reasons</button></h2>";
-  html += "                <div id='collapseReasons' class='accordion-collapse collapse' aria-labelledby='headingReasons' data-bs-parent='#configAccordion'><div class='accordion-body'>";
-  for (int i = 0; i < 5; ++i) {
-    html += "                  <div class='mb-3'><label for='reason" + String(i) + "' class='form-label'>Reason " + String(i+1) + "</label><input type='text' class='form-control' id='reason" + String(i) + "' name='reason" + String(i) + "' value='" + String(config.downtimeReasons[i]) + "' maxlength='31'></div>";
-  }
-  html += "                </div></div>";
-  html += "              </div>";
-  html += "            </div>";
-  html += "            <div class='d-grid gap-2 mt-4'><button type='submit' class='btn btn-primary btn-lg'>Save All Settings & Reboot</button></div>";
-  html += "          </form>";
-  html += "        </div>";
-  html += "      </div>";
-  html += "      <div class='card shadow-sm mt-4'><div class='card-header bg-light'><h4 class='mb-0'>System Actions</h4></div><div class='card-body'>";
-  html += "        <p>Current WiFi: <strong>" + (WiFi.status() == WL_CONNECTED ? WiFi.SSID() + " (IP: " + WiFi.localIP().toString() + ")" : "Not Connected / AP Mode") + "</strong></p>";
-  html += "        <form method='POST' action='/reconfigure_wifi' onsubmit='return confirm(\"Enter WiFi setup mode? Device will restart as an Access Point.\");' class='d-grid gap-2 mb-3'><button type='submit' class='btn btn-warning'>Reconfigure WiFi</button></form>";
-  html += "        <form method='POST' action='/clear_log' onsubmit='return confirm(\"Are you sure you want to CLEAR THE CURRENT EVENT LOG? This cannot be undone!\");' class='d-grid gap-2'><button type='submit' class='btn btn-danger'>Clear Current Event Log</button></form>";
-  html += "      </div></div>";
-  html += "    </div>";
-  html += "  </div>";
   html += "</div>";
+  
+  // Operational Settings Section
+  html += "<div class='config-section'>";
+  html += "<h3>Operational Settings</h3>";
+  html += "<div class='row'>";
+  html += "<div class='col-6'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Max Events in Log</label>";
+  html += "<input type='number' class='form-control' name='maxEvents' min='100' max='5000' value='" + String(config.maxEvents) + "' required>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='col-6'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Timezone Offset (hours from UTC)</label>";
+  html += "<input type='number' class='form-control' name='tzOffset' min='-12' max='14' step='0.5' value='" + String(config.tzOffset / 3600.0, 1) + "' required>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='row'>";
+  html += "<div class='col-6'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Highlight Stops Longer Than (minutes)</label>";
+  html += "<input type='number' class='form-control' name='longStopThreshold' min='1' max='1440' value='" + String(config.longStopThresholdSec/60) + "' required>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='col-6'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Monitoring Mode</label>";
+  html += "<select name='monitoringMode' class='form-control'>";
+  html += "<option value='" + String(MONITORING_MODE_PARALLEL) + "'" + (config.monitoringMode == MONITORING_MODE_PARALLEL ? " selected" : "") + ">Parallel (Assets Independent)</option>";
+  html += "<option value='" + String(MONITORING_MODE_SERIAL) + "'" + (config.monitoringMode == MONITORING_MODE_SERIAL ? " selected" : "") + ">Serial (System Stops if Any Asset Stops)</option>";
+  html += "</select>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  // Downtime Reasons Section
+  html += "<div class='config-section'>";
+  html += "<h3>Downtime Reasons</h3>";
+  html += "<div class='row'>";
+  for (int i = 0; i < 5; ++i) {
+    html += "<div class='col-6'>";
+    html += "<div class='form-group'>";
+    html += "<label class='form-label'>Reason " + String(i + 1) + "</label>";
+    html += "<input type='text' class='form-control' name='reason" + String(i) + "' value='" + String(config.downtimeReasons[i]) + "' maxlength='31'>";
+    html += "</div>";
+    html += "</div>";
+  }
+  html += "</div>";
+  html += "</div>";
+  
+  // Shift Configuration Section
+  html += "<div class='config-section'>";
+  html += "<h3>Production Data & Shift Setup</h3>";
+  html += "<div class='form-group'>";
+  html += "<label><input type='checkbox' name='enableShiftArchiving'" + (config.enableShiftArchiving ? " checked" : "") + "> Enable Shift-based Log Archiving</label>";
+  html += "</div>";
+  
+  if (config.enableShiftArchiving) {
+    html += "<div class='form-group'>";
+    html += "<label class='form-label'>Number of Shifts</label>";
+    html += "<input type='number' class='form-control' name='numShifts' min='1' max='" + String(MAX_CONFIGURABLE_SHIFTS) + "' value='" + String(config.numShifts) + "'>";
+    html += "</div>";
+    
+    for (uint8_t i = 0; i < config.numShifts && i < MAX_CONFIGURABLE_SHIFTS; ++i) {
+      html += "<div class='form-group'>";
+      html += "<label class='form-label'>Shift " + String(i + 1) + " Start Time (HH:MM)</label>";
+      html += "<input type='time' class='form-control' name='shiftStartTime" + String(i) + "' value='" + String(config.shifts[i].startTime) + "'>";
+      html += "</div>";
+    }
+  }
+  html += "</div>";
+  
+  // Action Buttons
+  html += "<div class='row'>";
+  html += "<div class='col-6'>";
+  html += "<button type='submit' class='btn btn-primary w-full'>Save All Settings & Reboot</button>";
+  html += "</div>";
+  html += "<div class='col-6'>";
+  html += "<div style='display: flex; gap: 0.5rem;'>";
+  html += "<a href='/events' class='btn btn-secondary' style='flex: 1;'>View Event Log</a>";
+  html += "<a href='/shiftlogs_page' class='btn btn-secondary' style='flex: 1;'>View Archives</a>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "</form>";
+  
+  // Management Section
+  html += "<div style='margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e5e7eb;'>";
+  html += "<div class='row'>";
+  html += "<div class='col-4'>";
+  html += "<form method='POST' action='/clear_log' onsubmit='return confirm(\"Clear all event logs? This cannot be undone.\");'>";
+  html += "<button type='submit' class='btn btn-danger w-full'>Clear Event Log</button>";
+  html += "</form>";
+  html += "</div>";
+  html += "<div class='col-4'>";
+  html += "<a href='/export_log' class='btn btn-secondary w-full'>Export Event Log</a>";
+  html += "</div>";
+  html += "<div class='col-4'>";
+  html += "<form method='POST' action='/reconfigure_wifi' onsubmit='return confirm(\"Reset WiFi settings? Device will restart in AP mode.\");'>";
+  html += "<button type='submit' class='btn btn-outline w-full'>Reset WiFi</button>";
+  html += "</form>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += getCommonJS();
   html += "<script>";
-  html += R"rawliteral(
-    function toggleShiftSettingsDisplay(enabled) {
-      document.getElementById('shiftSettingsBlockGlobal').style.display = enabled ? 'block' : 'none';
-    }
-    function renderShiftTimeInputs(numShiftsStr) {
-      const num = parseInt(numShiftsStr, 10);
-      const container = document.getElementById('shiftTimeInputsContainer');
-      container.innerHTML = '';
-      const maxShifts = )rawliteral" + String(MAX_CONFIGURABLE_SHIFTS) + R"rawliteral(;
-      if (isNaN(num) || num < 1 || num > maxShifts) { return; }
-      for (let i = 0; i < num; i++) {
-        const shiftDiv = document.createElement('div');
-        shiftDiv.classList.add('mb-3');
-        shiftDiv.innerHTML = `<label class="form-label">Shift ${i + 1} Start Time (HH:MM)</label>
-          <input type="time" class="form-control" name="shiftStartTime${i}" value="00:00" required>`;
-        container.appendChild(shiftDiv);
-      }
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-      const enableCheckbox = document.getElementById('enableShiftArchiving');
-      if (enableCheckbox) {
-        toggleShiftSettingsDisplay(enableCheckbox.checked);
-      }
-              
-    });
-  )rawliteral";
+  html += "document.getElementById('setupform').addEventListener('submit', function() {";
+  html += "  setTimeout(() => {";
+  html += "    const notice = document.getElementById('saveNotice');";
+  html += "    if (notice) {";
+  html += "      notice.classList.remove('hidden');";
+  html += "    }";
+  html += "  }, 500);";
+  html += "});";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
 
 String htmlDashboard() {
-  String html = "<!DOCTYPE html><html lang='en'><head><title>Dashboard</title>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
-  html += "<style>body{background-color:#f8f9fa;}</style>";
-  html += "</head><body>";
-
-  // --- Standard Bootstrap Navbar ---
-  html += "<nav class='navbar navbar-expand-lg navbar-dark bg-dark shadow-sm'>";
-  html += "  <div class='container-fluid'>";
-  html += "    <a class='navbar-brand' href='/'>Asset Availability Dashboard</a>";
-  html += "    <button class='navbar-toggler' type='button' data-bs-toggle='collapse' data-bs-target='#navbarNav'><span class='navbar-toggler-icon'></span></button>";
-  html += "    <div class='collapse navbar-collapse' id='navbarNav'>";
-  html += "      <ul class='navbar-nav ms-auto'>";
-  html += "        <li class='nav-item'><a class='nav-link active' href='/'>Dashboard</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/events'>Event Log</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/analytics-compare'>Compare Assets</a></li>";
-  html += "        <li class='nav-item'><a class='nav-link' href='/config'>Setup</a></li>";
-  html += "      </ul>";
-  html += "    </div>";
-  html += "  </div>";
-  html += "</nav>";
-
-  html += "<div class='container mt-4'>";
-  // --- Placeholder for System Status Card (Original Style) ---
+  String html = getCommonHeader("Dashboard", "dashboard");
+  
+  html += "<div class='container'>";
+  
+  // System Status Card (for Serial Mode)
   html += "<div id='systemWideStatus'></div>";
-
-  html += "<div class='card shadow-sm mb-4'>";
-  html += "  <div class='card-header'><h4>Asset Overview</h4></div>";
-  html += "  <div class='card-body'>";
-  // --- Statrow for individual asset quick stats (Original Style) ---
-  html += "    <div class='row g-2 mb-3' id='statrow'></div>";
-  html += "    <div id='chart-container' style='min-height: 300px;'><canvas id='barChart'></canvas></div>";
-  html += "  </div>";
-  html += "</div>";
-
-  html += "<div class='card shadow-sm'>";
-  html += "  <div class='card-header'><h4>Live Status Details</h4></div>";
-  html += "  <div class='card-body table-responsive'>";
-  html += "    <table id='summaryTable' class='table table-striped table-hover table-sm align-middle'><thead><tr>";
-  html += "      <th>Name</th><th>State</th><th>Avail (%)</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Actions</th>";
-  html += "    </tr></thead><tbody></tbody></table>";
-  html += "  </div>";
+  
+  // Asset Status Cards
+  html += "<div class='status-grid' id='statusGrid'></div>";
+  
+  // Chart Section
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Asset Overview</div>";
+  html += "<div class='card-body'>";
+  html += "<div class='chart-container'><canvas id='barChart'></canvas></div>";
   html += "</div>";
   html += "</div>";
+  
+  // Detailed Table
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Live Status Details</div>";
+  html += "<div class='card-body'>";
+  html += "<div style='overflow-x: auto;'>";
+  html += "<table id='summaryTable' class='table table-striped table-hover'>";
+  html += "<thead><tr>";
+  html += "<th>Asset</th><th>State</th><th>Availability</th><th>Runtime</th><th>Downtime</th><th>MTBF</th><th>MTTR</th><th>Stops</th><th>Actions</th>";
+  html += "</tr></thead><tbody></tbody></table>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='text-center mt-2'>";
+  html += "<span class='last-updated' style='color: #6b7280; font-size: 0.8rem;'></span>";
+  html += "</div>";
+  
+  html += "</div>";
 
+  html += getChartJS();
+  html += getCommonJS();
   html += "<script>";
   html += R"rawliteral(
-function formatHHMMSS(valInMinutes) {
-  if (isNaN(valInMinutes) || valInMinutes < 0.01) return "00:00:00";
-  let totalSeconds = Math.round(valInMinutes * 60);
-  let h = Math.floor(totalSeconds / 3600);
-  let m = Math.floor((totalSeconds % 3600) / 60);
-  let s = totalSeconds % 60;
-  return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
-}
-let chartObj=null;
+let chartObj = null;
+
 function updateDashboard() {
-  fetch('/api/summary').then(r=>r.json()).then(data=>{
-    const systemStatusContainer = document.getElementById('systemWideStatus');
-    let systemCardHtml = "";
-    if (data.monitoringMode === 1 && data.systemStats) { // MONITORING_MODE_SERIAL is 1
-        const isDown = data.systemStats.isDown;
-        const systemStateClass = isDown ? "bg-danger text-white" : "bg-success text-white";
-        const systemStatusText = isDown ? "SYSTEM DOWN" : "SYSTEM RUNNING";
-        systemCardHtml = `
-            <div class='card ${systemStateClass} shadow-sm mb-4'>
-                <div class='card-body'>
-                    <div class='d-flex justify-content-between align-items-center'>
-                        <div>
-                            <h5 class='card-title mb-1'>${systemStatusText}</h5>
-                            ${isDown && data.systemStats.triggerAsset ? `<small>Triggered by: ${data.systemStats.triggerAsset}</small><br>` : ''}
-                            <small>Availability: ${data.systemStats.availability.toFixed(2)}% | MTBF: ${formatHHMMSS(data.systemStats.mtbf_min)} | MTTR: ${formatHHMMSS(data.systemStats.mttr_min)}</small>
-                        </div>
-                        <div class='fs-1 fw-bold'>${data.systemStats.stopCount} <small class='fs-6 fw-normal'>Stops</small></div>
-                    </div>
-                </div>
-            </div>`;
-    }
-    if (systemStatusContainer) { systemStatusContainer.innerHTML = systemCardHtml; }
-
-    let tbody = document.querySelector('#summaryTable tbody');
-    if (!tbody) return;
-    tbody.innerHTML = ''; // Clear previous rows
-
-    let statrow = document.getElementById('statrow');
-    if(statrow) statrow.innerHTML = ''; // Clear previous stat cards
-
-    let assets = data.assets;
-    let n = assets.length;
-    for(let i=0;i<n;++i){
-      let asset = assets[i];
-      let stateBadge = asset.state == 1 ? "<span class='badge bg-success'>RUNNING</span>" : "<span class='badge bg-danger'>STOPPED</span>";
-      let assetNameEncoded = encodeURIComponent(asset.name);
-      let newRow = tbody.insertRow();
-      newRow.innerHTML = `
-        <td><strong>${asset.name}</strong></td>
-        <td>${stateBadge}</td>
-        <td>${asset.availability.toFixed(2)}</td>
-        <td>${formatHHMMSS(asset.total_runtime)}</td>
-        <td>${formatHHMMSS(asset.total_downtime)}</td>
-        <td>${formatHHMMSS(asset.mtbf)}</td>
-        <td>${formatHHMMSS(asset.mttr)}</td>
-        <td>${asset.stop_count}</td>
-        <td><a href='/analytics?asset=${assetNameEncoded}' class='btn btn-sm btn-outline-primary py-0'>Analytics</a></td>
-      `;
-
-      // --- Reverted Statrow Cards ---
-      if(statrow) {
-        let statCardClass = asset.state == 1 ? "border-success bg-success-subtle" : "border-danger bg-danger-subtle";
-        let statHtml = `
-          <div class="col">
-            <div class="card ${statCardClass} text-center h-100">
-              <div class="card-header bg-transparent border-0 fw-bold">${asset.name}</div>
-              <div class="card-body py-2">
-                <h5 class="card-title mb-0">${asset.availability.toFixed(1)}%</h5>
-                <small class="text-muted">Availability</small>
-              </div>
-              <div class="card-footer bg-transparent border-0 pt-0">
-                 <small>${stateBadge} | Stops: ${asset.stop_count}</small>
-              </div>
-            </div>
-          </div>`;
-        statrow.innerHTML += statHtml;
-      }
-    }
-    
-    let availData=[], names=[], runtimeData=[], downtimeData=[];
-    for (let asset of assets) {
-      availData.push(asset.availability);
-      runtimeData.push(asset.total_runtime);
-      downtimeData.push(asset.total_downtime);
-      names.push(asset.name);
-    }
-    
-    // --- Reverted Bar Chart Datasets (Original Style) ---
-    if (!window.chartObj) {
-      const ctx = document.getElementById('barChart').getContext('2d');
-      window.chartObj = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: names,
-          datasets: [
-            { label: 'Availability (%)', data: availData, backgroundColor: 'rgba(66, 165, 245, 0.7)', yAxisID: 'y' }, // #42a5f5
-            { label: 'Runtime (min)', data: runtimeData, backgroundColor: 'rgba(102, 187, 106, 0.7)', yAxisID: 'y1' }, // #66bb6a
-            { label: 'Downtime (min)', data: downtimeData, backgroundColor: 'rgba(239, 83, 80, 0.7)', yAxisID: 'y1' } // #ef5350
-          ]
-        },
-        options: {
-          responsive:true, maintainAspectRatio:false, indexAxis: 'x',
-          scales: {
-            y: { beginAtZero:true, max:100, title:{display:true,text:'Availability (%)'} },
-            y1: { beginAtZero:true, position: 'right', grid: { drawOnChartArea: false }, title: { display:true, text:'Time (min)' }}
-          },
-          plugins: { legend: { display: true } }
-        }
-      });
-    } else {
-      window.chartObj.data.labels = names;
-      window.chartObj.data.datasets[0].data = availData;
-      window.chartObj.data.datasets[1].data = runtimeData;
-      window.chartObj.data.datasets[2].data = downtimeData;
-      window.chartObj.update();
-    }
+  fetch('/api/summary').then(r => r.json()).then(data => {
+    updateSystemStatus(data);
+    updateStatusCards(data);
+    updateTable(data);
+    updateChart(data);
+    updateTimestamp();
   }).catch(e => console.error("Dashboard update error:", e));
 }
-// Find this section at the end of your htmlDashboard() function
-// ... (your JavaScript code inside the raw literal) ...
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', updateDashboard); }
-else { updateDashboard(); }
-setInterval(updateDashboard, 5000);
-)rawliteral";   // <--- THIS IS THE CORRECTED LINE
+
+function updateSystemStatus(data) {
+  const container = document.getElementById('systemWideStatus');
+  if (!container) return;
+  
+  if (data.monitoringMode === 1 && data.systemStats) {
+    const isDown = data.systemStats.isDown;
+    const statusClass = isDown ? 'stopped' : 'running';
+    const statusText = isDown ? 'SYSTEM DOWN' : 'SYSTEM RUNNING';
+    
+    container.innerHTML = `
+      <div class='card mb-3'>
+        <div class='card-body'>
+          <div class='d-flex justify-between align-center'>
+            <div>
+              <h3 style='margin: 0; color: ${isDown ? "#ef4444" : "#10b981"};'>${statusText}</h3>
+              ${isDown && data.systemStats.triggerAsset ? `<p style='margin: 0.5rem 0;'>Triggered by: ${data.systemStats.triggerAsset}</p>` : ''}
+              <p style='margin: 0; color: #6b7280; font-size: 0.9rem;'>
+                Availability: ${data.systemStats.availability.toFixed(2)}% | 
+                MTBF: ${formatDuration(data.systemStats.mtbf_min)} | 
+                MTTR: ${formatDuration(data.systemStats.mttr_min)}
+              </p>
+            </div>
+            <div style='text-align: right;'>
+              <h3 style='margin: 0; font-size: 2rem;'>${data.systemStats.stopCount}</h3>
+              <p style='margin: 0; color: #6b7280;'>Stops</p>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    container.innerHTML = '';
+  }
+}
+
+function updateStatusCards(data) {
+  const grid = document.getElementById('statusGrid');
+  if (!grid) return;
+  
+  const assets = data.assets || [];
+  let html = '';
+  
+  assets.forEach(asset => {
+    const statusClass = asset.state == 1 ? 'running' : 'stopped';
+    const statusText = asset.state == 1 ? 'RUNNING' : 'STOPPED';
+    const badgeClass = asset.state == 1 ? 'badge-success' : 'badge-danger';
+    
+    html += `
+      <div class='status-card ${statusClass}'>
+        <h3>${asset.availability.toFixed(1)}%</h3>
+        <p><strong>${asset.name}</strong></p>
+        <p><span class='badge ${badgeClass}'>${statusText}</span></p>
+        <p style='margin-top: 0.5rem; font-size: 0.8rem;'>Stops: ${asset.stop_count}</p>
+      </div>`;
+  });
+  
+  grid.innerHTML = html;
+}
+
+function updateTable(data) {
+  const tbody = document.querySelector('#summaryTable tbody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  const assets = data.assets || [];
+  
+  assets.forEach(asset => {
+    const row = tbody.insertRow();
+    const statusBadge = asset.state == 1 ? 
+      `<span class='badge badge-success'>RUNNING</span>` :
+      `<span class='badge badge-danger'>STOPPED</span>`;
+    
+    row.innerHTML = `
+      <td><strong>${asset.name}</strong></td>
+      <td>${statusBadge}</td>
+      <td>${asset.availability.toFixed(2)}%</td>
+      <td>${formatDuration(asset.total_runtime)}</td>
+      <td>${formatDuration(asset.total_downtime)}</td>
+      <td>${formatDuration(asset.mtbf)}</td>
+      <td>${formatDuration(asset.mttr)}</td>
+      <td>${asset.stop_count}</td>
+      <td><a href='/analytics?asset=${encodeURIComponent(asset.name)}' class='btn btn-primary btn-sm'>Analytics</a></td>
+    `;
+  });
+}
+
+function updateChart(data) {
+  const assets = data.assets || [];
+  const labels = assets.map(a => a.name);
+  const availData = assets.map(a => a.availability);
+  const runtimeData = assets.map(a => a.total_runtime);
+  const downtimeData = assets.map(a => a.total_downtime);
+  
+  if (!chartObj) {
+    const canvas = document.getElementById('barChart');
+    if (canvas) {
+      chartObj = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Availability (%)', data: availData, backgroundColor: '#3b82f6' },
+            { label: 'Runtime (min)', data: runtimeData, backgroundColor: '#10b981' },
+            { label: 'Downtime (min)', data: downtimeData, backgroundColor: '#ef4444' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+  } else {
+    chartObj.data.labels = labels;
+    chartObj.data.datasets[0].data = availData;
+    chartObj.data.datasets[1].data = runtimeData;
+    chartObj.data.datasets[2].data = downtimeData;
+    chartObj.update();
+  }
+}
+
+// Initialize
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', updateDashboard);
+} else {
+  updateDashboard();
+}
+startAutoRefresh(updateDashboard);
+)rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
