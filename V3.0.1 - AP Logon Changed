@@ -208,28 +208,61 @@ bool deleteOldestLogFile() {
 }
 
 String wifiConfigHTML() {
-  String html = "<!DOCTYPE html><html><head><title>WiFi Setup</title>"
+  String html = "<!DOCTYPE html><html><head><title>WiFi Setup - Production Monitor</title>"
                 "<meta charset='UTF-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
                 "<style>"
-                // ... styles ...
-                ".localap-btn { background: #f39c12; color: #fff; border: none; padding: 0.7em 1.5em; border-radius: 4px; margin-top:2em; cursor:pointer; width:100%; }"
+                "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }"
+                ".container { background: #fff; border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 2.5rem; max-width: 450px; width: 90%; margin: 20px; }"
+                "h1 { text-align: center; color: #333; margin-bottom: 1.5rem; font-size: 1.8rem; font-weight: 600; }"
+                ".form-group { margin-bottom: 1.5rem; }"
+                "label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: 500; font-size: 0.95rem; }"
+                "input[type='text'], input[type='password'] { width: 100%; padding: 0.8rem; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 1rem; transition: border-color 0.3s ease, box-shadow 0.3s ease; box-sizing: border-box; }"
+                "input[type='text']:focus, input[type='password']:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }"
+                "input[type='submit'] { width: 100%; padding: 0.9rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.3s ease; }"
+                "input[type='submit']:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3); }"
+                ".localap-btn { width: 100%; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: #fff; border: none; padding: 0.9rem; border-radius: 8px; margin-top: 1rem; cursor: pointer; font-size: 1rem; font-weight: 600; transition: transform 0.2s ease, box-shadow 0.3s ease; }"
+                ".localap-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(243, 156, 18, 0.3); }"
+                ".note { background: #f8f9fa; border-left: 4px solid #667eea; padding: 1rem; border-radius: 4px; margin: 1.5rem 0; color: #666; font-size: 0.9rem; line-height: 1.5; }"
+                ".divider { text-align: center; margin: 2rem 0; position: relative; color: #999; font-size: 0.9rem; }"
+                ".divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e1e5e9; z-index: 1; }"
+                ".divider span { background: #fff; padding: 0 1rem; position: relative; z-index: 2; }"
+                ".status-info { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; color: #0d47a1; font-size: 0.9rem; }"
+                ".device-info { text-align: center; margin-bottom: 1.5rem; }"
+                ".device-info h2 { color: #667eea; font-size: 1.3rem; margin-bottom: 0.5rem; }"
+                ".device-info p { color: #666; font-size: 0.9rem; margin: 0; }"
+                "@media (max-width: 480px) { .container { padding: 1.5rem; margin: 10px; } h1 { font-size: 1.5rem; } }"
                 "</style>"
                 "</head><body>"
+                "<div class='container'>"
+                "<div class='device-info'>"
+                "<h2>Production Monitor</h2>"
+                "<p>Asset Monitoring System Configuration</p>"
+                "</div>"
+                "<div class='status-info'>"
+                "📡 Device is in Access Point mode. Configure WiFi to connect to your network or run locally."
+                "</div>"
                 "<form method='POST' action='/wifi_save_config'>"
-                "<h1>WiFi Setup</h1>"
-                "<label>SSID:</label>"
-                "<input type='text' name='ssid' maxlength='32' required value='";
+                "<h1>WiFi Network Setup</h1>"
+                "<div class='form-group'>"
+                "<label>Network Name (SSID):</label>"
+                "<input type='text' name='ssid' maxlength='32' required placeholder='Enter WiFi network name' value='";
   html += wifi_ssid;
-  html += "'>"
-          "<label>Password:</label>"
-          "<input type='password' name='password' maxlength='64' value='";
+  html += "'></div>"
+          "<div class='form-group'>"
+          "<label>Network Password:</label>"
+          "<input type='password' name='password' maxlength='64' placeholder='Enter WiFi password' value='";
   html += wifi_pass;
-  html += "'>"
-          "<div class='note'>Enter your WiFi details above. Device will reboot after saving.</div>"
-          "<input type='submit' value='Save & Reboot'>"
-          "</form>";
-  html += "<form method='POST' action='/run_local_ap'><input type='submit' class='localap-btn' value='Run Locally on Access Point'></form>";
-  html += "</body></html>";
+  html += "'></div>"
+          "<div class='note'>⚠️ Device will automatically reboot and connect to the specified network after saving. The device IP may change.</div>"
+          "<input type='submit' value='Save WiFi Settings & Connect'>"
+          "</form>"
+          "<div class='divider'><span>OR</span></div>"
+          "<form method='POST' action='/run_local_ap'>"
+          "<input type='submit' class='localap-btn' value='🏠 Run Locally (Access Point Mode)'>"
+          "</form>"
+          "<div class='note'>💡 Local mode allows you to use the monitoring system without internet connectivity. Connect to this device's WiFi network and access the dashboard directly.</div>"
+          "</div></body></html>";
   return html;
 }
 
@@ -287,13 +320,51 @@ void startLocalAPMode() {
     Serial.print("Local AP Mode Started. Connect to AP 'AssetMonitor_Config', IP: ");
     Serial.println(WiFi.softAPIP());
 
-    // Serve the dashboard page on "/"
-    server.on("/", HTTP_GET, [](){
-        server.send(200, "text/html", htmlDashboard());
+    // Set up all the necessary routes for full functionality in AP mode
+    server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
+    server.on("/dashboard", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
+    server.on("/config", HTTP_GET, []() { server.send(200, "text/html", htmlConfig()); });
+    server.on("/events", HTTP_GET, sendHtmlEventsPage);
+    server.on("/asset", HTTP_GET, []() {
+        if (server.hasArg("idx")) {
+            uint8_t idx = server.arg("idx").toInt();
+            if (idx < config.assetCount && idx < MAX_ASSETS) { 
+                server.send(200, "text/html", htmlAssetDetail(idx)); 
+                return; 
+            }
+        }
+        server.send(404, "text/plain", "Asset not found");
     });
-
+    server.on("/shiftlogs_page", HTTP_GET, handleShiftLogsPage);
+    server.on("/download_shiftlog", HTTP_GET, handleDownloadShiftLog);
+    server.on("/analytics", HTTP_GET, []() { server.send(200, "text/html", htmlAnalytics()); });
+    server.on("/analytics-compare", HTTP_GET, []() { server.send(200, "text/html", htmlAnalyticsCompare()); });
+    server.on("/reconfigure_wifi", HTTP_POST, handleWiFiReconfigurePost);
+    server.on("/save_config", HTTP_POST, handleConfigPost);
+    server.on("/clear_log", HTTP_POST, handleClearLog);
+    server.on("/export_log", HTTP_GET, handleExportLog);
+    server.on("/api/summary", HTTP_GET, handleApiSummary);
+    server.on("/api/events", HTTP_GET, handleApiEvents);
+    server.on("/api/config", HTTP_GET, handleApiConfig);
+    server.on("/api/note", HTTP_POST, handleApiNote);
+    server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
+    server.on("/manual_time_set_page", HTTP_GET, []() { server.send(200, "text/html", getManualTimeSetHTML()); });
+    server.on("/manual_time_set", HTTP_POST, handleManualTimeSet);
+    
+    server.onNotFound(handleNotFound);
     server.begin();
-    while (true) { server.handleClient(); delay(10); }
+    while (true) { 
+        server.handleClient(); 
+        
+        // --- OLED update in AP mode (ADDITION) ---
+        unsigned long currentTime = millis();
+        if (currentTime - lastOledUpdate > 2000) { // Update every 2 seconds
+            updateOledDisplay();
+            lastOledUpdate = currentTime;
+        }
+        
+        delay(10); 
+    }
 }
 
 // --- Add the handler function ---
