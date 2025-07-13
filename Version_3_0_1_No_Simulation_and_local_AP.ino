@@ -2553,12 +2553,22 @@ else { initializeEventPage(); }
 
 // Handler Functions)
 
-void handleWiFiReconfigurePost() { // From your V21
-  prefs.begin("assetmon", false); prefs.remove("ssid"); prefs.remove("pass"); prefs.end();
-  Serial.println("WiFi credentials cleared. Restarting in AP mode.");
-  String message = "<!DOCTYPE html><html><head><title>WiFi Reconfiguration</title><style>body{font-family:Arial,sans-serif;margin:20px;padding:15px;border:1px solid #ddd;border-radius:5px;text-align:center;} h2{color:green;}</style></head><body><h2>WiFi Credentials Cleared</h2><p>Device will now restart in Access Point mode ('AssetMonitor_Config'). Connect to this AP to set up new WiFi.</p><p>This page will attempt to redirect in 5 seconds, or you can manually go to the device's new IP (usually 192.168.4.1) once connected to the AP.</p><meta http-equiv='refresh' content='7;url=http://192.168.4.1/' /></body></html>"; // Added more info to message
-  server.sendHeader("Connection", "close"); server.send(200, "text/html", message);
-  delay(1500); // Slightly longer delay
+void handleWiFiReconfigurePost() {
+  // Clear WiFiManager stored credentials using proper WiFiManager method
+  WiFiManager wm;
+  wm.resetSettings();
+  
+  // Also clear any locally stored credentials in preferences for completeness
+  prefs.begin("assetmon", false); 
+  prefs.remove("ssid"); 
+  prefs.remove("pass"); 
+  prefs.end();
+  
+  Serial.println("WiFi credentials cleared from both WiFiManager and preferences. Restarting in AP mode.");
+  String message = "<!DOCTYPE html><html><head><title>WiFi Reconfiguration</title><style>body{font-family:Arial,sans-serif;margin:20px;padding:15px;border:1px solid #ddd;border-radius:5px;text-align:center;} h2{color:green;}</style></head><body><h2>WiFi Credentials Cleared</h2><p>Device will now restart in Access Point mode ('AssetMonitor-Config'). Connect to this AP to set up new WiFi.</p><p>This page will attempt to redirect in 5 seconds, or you can manually go to the device's new IP (usually 192.168.4.1) once connected to the AP.</p><meta http-equiv='refresh' content='7;url=http://192.168.4.1/' /></body></html>";
+  server.sendHeader("Connection", "close"); 
+  server.send(200, "text/html", message);
+  delay(1500);
   ESP.restart();
 }
 
@@ -2670,9 +2680,12 @@ void handleConfigPost() {
   // --- End Parse Shift Configuration ---
 
   saveConfig();
-  server.sendHeader("Location", "/config#saveNotice");
-  server.send(303);
-  delay(1000); // Give client time to process redirect
+  
+  // Send a proper response with user feedback before rebooting
+  String message = "<!DOCTYPE html><html><head><title>Settings Saved</title><style>body{font-family:Arial,sans-serif;margin:20px;padding:15px;border:1px solid #ddd;border-radius:5px;text-align:center;} h2{color:green;}</style></head><body><h2>Settings Saved Successfully!</h2><p>Device is rebooting now to apply all settings...</p><p>You will be redirected to the setup page in 8 seconds.</p><meta http-equiv='refresh' content='8;url=/config' /></body></html>";
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/html", message);
+  delay(2000); // Give client time to receive response
   ESP.restart(); // Reboot to apply all settings cleanly
 }
 
@@ -2730,8 +2743,11 @@ void handleClearLog() { // Patched version
         logSystemEvent(true, now, "System State After Log Clear - All Assets Up");
     }
   }
-  server.sendHeader("Location", "/config"); // Or wherever you want to redirect
-  server.send(303);
+  
+  // Send proper feedback to user before redirecting
+  String message = "<!DOCTYPE html><html><head><title>Log Cleared</title><style>body{font-family:Arial,sans-serif;margin:20px;padding:15px;border:1px solid #ddd;border-radius:5px;text-align:center;} h2{color:green;}</style></head><body><h2>Event Log Cleared Successfully!</h2><p>All event history has been cleared and statistics have been reset.</p><p>Redirecting to setup page in 3 seconds...</p><meta http-equiv='refresh' content='3;url=/config' /></body></html>";
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/html", message);
 }
 
 void handleShiftLogsPage() {
