@@ -143,19 +143,7 @@ String formatMMSS(unsigned long seconds);
 void loadConfig();
 void saveConfig();
 void setupWiFiSmart();
-
-#include <vector> // --- SIM PATCH --- Add vector include for downtime reasons
-
-struct SimulatedAsset {
-  String name;
-  bool isRunning;
-  unsigned long nextEventTime; // The millis() value when the next event should occur
-  String timeToNextEventStr;   // A pre-formatted string for the UI
-};
-
-bool simulationEnabled = false; 
-SimulatedAsset simulatedAssets[MAX_ASSETS]; 
-std::vector<String> simDowntimeReasons;
+::vector<String> simDowntimeReasons;
 
 // --- Global Constants ---
 const char* DEFAULT_DOWNTIME_REASONS[5] = {
@@ -831,18 +819,6 @@ void setup() {
   loadConfig();
   Serial.println("Configuration loaded/initialized.");
 
-  // --- SIM PATCH --- START ---
-  for (int i = 0; i < config.assetCount; i++) {
-    simulatedAssets[i].name = String(config.assets[i].name); 
-    simulatedAssets[i].isRunning = true;
-  }
-  for (int i = 0; i < 5; i++) {
-    String reason = String(config.downtimeReasons[i]);
-    if (reason.length() > 0) {
-      simDowntimeReasons.push_back(reason);
-    }
-  }
-  // --- SIM PATCH --- END ---
 
   initializeShiftState();
   Serial.printf("DEBUG: enableShiftArchiving=%d, g_shiftFeatureInitialized=%d\n", config.enableShiftArchiving, g_shiftFeatureInitialized);
@@ -939,48 +915,6 @@ void setup() {
 // --- Block 2:  Simulation API Endpoints 
 // =================================================================
 
-// Endpoint to START the simulation
-server.on("/api/simulation/start", HTTP_POST, []() { // No arguments in the lambda
-  if (!simulationEnabled) {
-    simulationEnabled = true;
-    unsigned long currentTime = millis();
-    for (int i = 0; i < config.assetCount; i++) {
-      // Set initial state to running and log the START event
-      simulatedAssets[i].isRunning = true;
-      logEvent(i, true, time(nullptr), "Simulation Started"); 
-      
-      // Schedule the first random STOP
-      unsigned long nextInterval = random(60000, 600001); // 1 to 10 minutes
-      simulatedAssets[i].nextEventTime = currentTime + nextInterval;
-    }
-  }
-  // Use the global 'server' object to send the response
-  server.send(200, "application/json", "{\"status\":\"Simulation started\"}");
-});
-
-// Endpoint to STOP the simulation
-server.on("/api/simulation/stop", HTTP_POST, []() { // No arguments in the lambda
-  simulationEnabled = false;
-  // Use the global 'server' object to send the response
-  server.send(200, "application/json", "{\"status\":\"Simulation stopped\"}");
-});
-
-// Endpoint for the UI to get the current status and countdowns
-server.on("/api/simulation/status", HTTP_GET, []() { // No arguments in the lambda
-  String json = "{\"enabled\": " + String(simulationEnabled ? "true" : "false") + ", \"assets\": [";
-  for (int i = 0; i < config.assetCount; i++) {
-    json += "{";
-    json += "\"name\": \"" + simulatedAssets[i].name + "\",";
-    json += "\"timeToNext\": \"" + simulatedAssets[i].timeToNextEventStr + "\"";
-    json += "}";
-    if (i < config.assetCount - 1) {
-      json += ",";
-    }
-  }
-  json += "]}";
-  // Use the global 'server' object to send the response
-  server.send(200, "application/json", json);
-});
 // =================================================================
 
   server.onNotFound(handleNotFound);
@@ -1002,17 +936,6 @@ void loop() {
     processShiftLogic();
   }
 
-  handleSimulation();
-
-  if (simulationEnabled) {
-    delay(200);
-    // --- OLED: update every 5 seconds (ADDITION) ---
-    if (millis() - lastOledUpdate > 5000) {
-      updateOledDisplay();
-      lastOledUpdate = millis();
-    }
-    return;
-  }
 
   time_t now_ts = time(nullptr);
 
@@ -1551,65 +1474,7 @@ String htmlConfig() {
       if (enableCheckbox) {
         toggleShiftSettingsDisplay(enableCheckbox.checked);
       }
-      // --- SIM PATCH --- START ---
-      // Add the new handler for simulation controls
-      function handleSimulationControls() {
-        const toggleBtn = document.getElementById('simToggleButton');
-        const notification = document.getElementById('simulationNotification');
-        const statusContainer = document.getElementById('simulationStatusContainer');
-
-        if(!toggleBtn) return; // In case element isn't on the page
-
-        toggleBtn.addEventListener('click', () => {
-            const isRunning = toggleBtn.dataset.running === 'true';
-            const endpoint = isRunning ? '/api/simulation/stop' : '/api/simulation/start';
-            toggleBtn.disabled = true;
-            fetch(endpoint, { method: 'POST' })
-                .then(() => setTimeout(updateSimStatus, 1000));
-        });
-
-        function updateSimStatus() {
-            fetch('/api/simulation/status')
-                .then(res => res.json())
-                .then(data => {
-                    toggleBtn.disabled = false;
-                    if (data.enabled) {
-                        toggleBtn.textContent = 'Stop Simulation';
-                        toggleBtn.dataset.running = 'true';
-                        toggleBtn.classList.remove('btn-primary');
-                        toggleBtn.classList.add('btn-danger');
-                        notification.innerHTML = '<strong>Simulation is running.</strong> Physical pin monitoring is disabled.';
-                        notification.style.display = 'block';
-
-                        let statusHtml = '<ul class="list-group">';
-                        data.assets.forEach(asset => {
-                            statusHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                                             ${asset.name}
-                                             <span class="badge bg-secondary rounded-pill">Next event in: ${asset.timeToNext}</span>
-                                           </li>`;
-                        });
-                        statusHtml += '</ul>';
-                        statusContainer.innerHTML = statusHtml;
-
-                    } else {
-                        toggleBtn.textContent = 'Start Simulation';
-                        toggleBtn.dataset.running = 'false';
-                        toggleBtn.classList.remove('btn-danger');
-                        toggleBtn.classList.add('btn-primary');
-                        notification.style.display = 'none';
-                        statusContainer.innerHTML = '<p>Simulation is currently stopped.</p>';
-                    }
-                }).catch(err => {
-                    console.error("Could not fetch sim status", err);
-                    statusContainer.innerHTML = '<p class="text-danger">Could not fetch simulation status.</p>';
-                    toggleBtn.disabled = false;
-                });
-        }
-        setInterval(updateSimStatus, 5000);
-        updateSimStatus();
-      }
-      handleSimulationControls();
-      // --- SIM PATCH --- END ---
+              
     });
   )rawliteral";
   html += "</script>";
