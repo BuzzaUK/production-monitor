@@ -143,6 +143,10 @@ String formatMMSS(unsigned long seconds);
 void loadConfig();
 void saveConfig();
 void setupWiFiSmart();
+bool checkInternetConnectivity();
+String getLocalResources();
+void handleManualTimeSet();
+String getManualTimeSetHTML();
 
 
 // --- Global Constants ---
@@ -169,6 +173,11 @@ bool g_systemStateInitialized = false;
 int g_currentShiftIndex = -1;
 time_t g_currentShiftStartTimeEpoch = 0;
 bool g_shiftFeatureInitialized = false;
+
+// Internet connectivity tracking
+bool g_internetAvailable = false;
+unsigned long g_lastConnectivityCheck = 0;
+const unsigned long CONNECTIVITY_CHECK_INTERVAL = 30000; // Check every 30 seconds
 
 
 // --- Function Implementations ---
@@ -436,6 +445,7 @@ void setupTime() {
 
   if (now < 1609459200) {
     Serial.println("NTP time sync FAILED. Timestamps will be incorrect!");
+    Serial.println("Manual time setting will be available from the setup page.");
     // We'll still set the TZ rule in case time syncs later.
   } else {
     Serial.println("NTP sync successful. Base UTC time acquired.");
@@ -454,6 +464,10 @@ void setupTime() {
   } else {
     Serial.println("Failed to obtain local time.");
   }
+  
+  // Step 4: Initialize connectivity checking
+  g_internetAvailable = checkInternetConnectivity();
+  Serial.printf("Internet connectivity: %s\n", g_internetAvailable ? "Available" : "Not available");
 }
 
 // --- New function to log system-wide events (for Serial mode) ---
@@ -910,6 +924,8 @@ void setup() {
   server.on("/api/config", HTTP_GET, handleApiConfig);
   server.on("/api/note", HTTP_POST, handleApiNote);
   server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
+  server.on("/manual_time_set_page", HTTP_GET, []() { server.send(200, "text/html", getManualTimeSetHTML()); });
+  server.on("/manual_time_set", HTTP_POST, handleManualTimeSet);
   
  // =================================================================
   server.onNotFound(handleNotFound);
@@ -926,6 +942,9 @@ unsigned long lastOledUpdate = 0;
 
 void loop() {
   server.handleClient();
+
+  // Periodic connectivity checking
+  checkInternetConnectivity();
 
   if (config.enableShiftArchiving && g_shiftFeatureInitialized) {
     processShiftLogic();
@@ -1189,7 +1208,15 @@ String htmlAssetDetail(uint8_t idx) {
 
   String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Detail: " + assetNameStr + "</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  
+  // Check internet connectivity and use appropriate resources
+  bool hasInternet = checkInternetConnectivity();
+  if (hasInternet) {
+    html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  } else {
+    html += getLocalResources();
+  }
+  
   html += "<style>body{background-color:#f8f9fa;}</style>";
   html += "</head><body>";
 
@@ -1213,7 +1240,12 @@ String htmlAssetDetail(uint8_t idx) {
   html += "  </div>";
   html += "</div>";
 
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  // Use appropriate JavaScript resources based on connectivity
+  if (hasInternet) {
+    html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  }
+  // Local bootstrap functionality is already included in getLocalResources()
+  
   html += "</body></html>";
   return html;
 }
@@ -1224,8 +1256,16 @@ String htmlAssetDetail(uint8_t idx) {
 
 String htmlConfig() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  
+  // Check internet connectivity and use appropriate resources
+  bool hasInternet = checkInternetConnectivity();
+  if (hasInternet) {
+    html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
+    html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  } else {
+    html += getLocalResources();
+  }
+  
   html += "<style>";
   html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}";
   html += "header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001; font-size:1.6em; font-weight:700;}";
@@ -1332,6 +1372,19 @@ String htmlConfig() {
   html += "      </div>";
   html += "      <div class='card shadow-sm mt-4'><div class='card-header bg-light'><h4 class='mb-0'>System Actions</h4></div><div class='card-body'>";
   html += "        <p>Current WiFi: <strong>" + (WiFi.status() == WL_CONNECTED ? WiFi.SSID() + " (IP: " + WiFi.localIP().toString() + ")" : "Not Connected / AP Mode") + "</strong></p>";
+  
+  // Display connectivity status and add manual time setting button
+  bool hasInternet = checkInternetConnectivity();
+  html += "        <p>Internet Status: <strong>" + String(hasInternet ? "Connected" : "Offline") + "</strong></p>";
+  
+  time_t now = time(nullptr);
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+  char timeStr[64];
+  strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  html += "        <p>Current Time: <strong>" + String(timeStr) + "</strong></p>";
+  
+  html += "        <button type='button' class='btn btn-info mb-3' onclick='openTimeSetWindow()'>Set Time & Date Manually</button><br>";
   html += "        <form method='POST' action='/reconfigure_wifi' onsubmit='return confirm(\"Enter WiFi setup mode? Device will restart as an Access Point.\");' class='d-grid gap-2 mb-3'><button type='submit' class='btn btn-warning'>Reconfigure WiFi</button></form>";
   html += "        <form method='POST' action='/clear_log' onsubmit='return confirm(\"Are you sure you want to CLEAR THE CURRENT EVENT LOG? This cannot be undone!\");' class='d-grid gap-2'><button type='submit' class='btn btn-danger'>Clear Current Event Log</button></form>";
   html += "      </div></div>";
@@ -1357,6 +1410,15 @@ String htmlConfig() {
         container.appendChild(shiftDiv);
       }
     }
+    function openTimeSetWindow() {
+      const width = 500;
+      const height = 600;
+      const left = (screen.width / 2) - (width / 2);
+      const top = (screen.height / 2) - (height / 2);
+      window.open('/manual_time_set_page', 'timeSetWindow', 
+        'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + 
+        ',resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no,status=no');
+    }
     document.addEventListener('DOMContentLoaded', function() {
       const enableCheckbox = document.getElementById('enableShiftArchiving');
       if (enableCheckbox) {
@@ -1366,7 +1428,13 @@ String htmlConfig() {
     });
   )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  
+  // Use appropriate JavaScript resources based on connectivity
+  if (hasInternet) {
+    html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  }
+  // Local bootstrap functionality is already included in getLocalResources()
+  
   html += "</body></html>";
   return html;
 }
@@ -1374,9 +1442,22 @@ String htmlConfig() {
 String htmlDashboard() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Dashboard</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  
+  // Check internet connectivity and use appropriate resources
+  bool hasInternet = checkInternetConnectivity();
+  if (hasInternet) {
+    html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
+    html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+    html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  } else {
+    html += getLocalResources();
+    // Add minimal Chart.js functionality for offline mode
+    html += "<script>";
+    html += "window.Chart = function(ctx, config) { this.ctx = ctx; this.config = config; this.update = function(){}; this.destroy = function(){}; };";
+    html += "Chart.register = function(){};";
+    html += "</script>";
+  }
+  
   html += "<style>body{background-color:#f8f9fa;}</style>";
   html += "</head><body>";
 
@@ -1546,7 +1627,13 @@ else { updateDashboard(); }
 setInterval(updateDashboard, 5000);
 )rawliteral";   // <--- THIS IS THE CORRECTED LINE
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  
+  // Use appropriate JavaScript resources based on connectivity
+  if (hasInternet) {
+    html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  }
+  // Local bootstrap functionality is already included in getLocalResources()
+  
   html += "</body></html>";
   return html;
 }
@@ -1556,10 +1643,23 @@ String htmlAnalytics() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Analytics: ";
   html += assetName + "</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js'></script>";
+  
+  // Check internet connectivity and use appropriate resources
+  bool hasInternet = checkInternetConnectivity();
+  if (hasInternet) {
+    html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
+    html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+    html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+    html += "<script src='https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js'></script>";
+  } else {
+    html += getLocalResources();
+    // Add minimal Chart.js functionality for offline mode
+    html += "<script>";
+    html += "window.Chart = function(ctx, config) { this.ctx = ctx; this.config = config; this.update = function(){}; this.destroy = function(){}; };";
+    html += "Chart.register = function(){};";
+    html += "</script>";
+  }
+  
   html += "<style>body{background-color:#f8f9fa;} #ganttChartContainer {min-height: 250px; margin-bottom:20px;} .card-header h4 { margin-bottom:0; }</style>";
   html += "</head><body>";
 
@@ -1986,7 +2086,13 @@ function fetchAnalyticsData() {
 document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  
+  // Use appropriate JavaScript resources based on connectivity
+  if (hasInternet) {
+    html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  }
+  // Local bootstrap functionality is already included in getLocalResources()
+  
   html += "</body></html>";
   return html;
 }
@@ -1998,10 +2104,23 @@ document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 String htmlAnalyticsCompare() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Compare Assets</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  
+  // Check internet connectivity and use appropriate resources
+  bool hasInternet = checkInternetConnectivity();
+  if (hasInternet) {
+    html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
+    html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+    html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'>";
+    html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  } else {
+    html += getLocalResources();
+    // Add minimal Chart.js functionality for offline mode
+    html += "<script>";
+    html += "window.Chart = function(ctx, config) { this.ctx = ctx; this.config = config; this.update = function(){}; this.destroy = function(){}; };";
+    html += "Chart.register = function(){};";
+    html += "</script>";
+  }
+  
   html += "<style>";
   html += "body{background-color:#f8f9fa;font-family:Roboto,Arial,sans-serif;}";
   html += ".leaderboard-badge{font-size:1.4em;margin-right:0.5em;}";
@@ -2199,7 +2318,13 @@ function renderCompareTablePage() {
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fetchCompareDataPage) : fetchCompareDataPage();
 )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  
+  // Use appropriate JavaScript resources based on connectivity
+  if (hasInternet) {
+    html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  }
+  // Local bootstrap functionality is already included in getLocalResources()
+  
   html += "</body></html>";
   return html;
 }
@@ -2211,11 +2336,21 @@ void sendHtmlEventsPage() {
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", ""); // Send headers
 
+  // Check internet connectivity
+  bool hasInternet = checkInternetConnectivity();
+
   // --- Start of HTML Document ---
   server.sendContent("<!DOCTYPE html><html lang='en'><head><title>Event Log</title>");
   server.sendContent("<meta name='viewport' content='width=device-width,initial-scale=1'>");
-  server.sendContent("<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>");
-  server.sendContent("<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>");
+  
+  if (hasInternet) {
+    server.sendContent("<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>");
+    server.sendContent("<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>");
+  } else {
+    // Send local resources as content
+    String localRes = getLocalResources();
+    server.sendContent(localRes);
+  }
 
   // --- ENHANCED CSS ---
   server.sendContent("<style>");
@@ -3070,3 +3205,217 @@ void updateEventNote(String date_str, String time_str, String assetName_str, Str
 }
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); } // From your V21
+
+// Internet connectivity detection
+bool checkInternetConnectivity() {
+  unsigned long currentTime = millis();
+  if (currentTime - g_lastConnectivityCheck < CONNECTIVITY_CHECK_INTERVAL) {
+    return g_internetAvailable;
+  }
+  
+  g_lastConnectivityCheck = currentTime;
+  
+  if (!WiFi.isConnected()) {
+    g_internetAvailable = false;
+    return false;
+  }
+  
+  // Try to connect to a reliable server
+  WiFiClient client;
+  if (client.connect("8.8.8.8", 53)) { // Google DNS
+    client.stop();
+    g_internetAvailable = true;
+    return true;
+  }
+  
+  g_internetAvailable = false;
+  return false;
+}
+
+// Local CSS and JS resources (minified for space efficiency)
+String getLocalResources() {
+  String resources = "<style>";
+  
+  // Bootstrap 5.3.0 minimal CSS (core components only)
+  resources += ":root{--bs-blue:#0d6efd;--bs-indigo:#6610f2;--bs-purple:#6f42c1;--bs-pink:#d63384;--bs-red:#dc3545;--bs-orange:#fd7e14;--bs-yellow:#ffc107;--bs-green:#198754;--bs-teal:#20c997;--bs-cyan:#0dcaf0;--bs-white:#fff;--bs-gray:#6c757d;--bs-gray-dark:#343a40;--bs-primary:#0d6efd;--bs-secondary:#6c757d;--bs-success:#198754;--bs-info:#0dcaf0;--bs-warning:#ffc107;--bs-danger:#dc3545;--bs-light:#f8f9fa;--bs-dark:#212529;--bs-font-family-sans-serif:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji';--bs-body-font-family:var(--bs-font-family-sans-serif)}";
+  resources += "*,::after,::before{box-sizing:border-box}body{margin:0;font-family:var(--bs-body-font-family);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff}";
+  resources += ".container,.container-fluid{width:100%;padding-right:var(--bs-gutter-x,.75rem);padding-left:var(--bs-gutter-x,.75rem);margin-right:auto;margin-left:auto}";
+  resources += ".row{--bs-gutter-x:1.5rem;--bs-gutter-y:0;display:flex;flex-wrap:wrap;margin-top:calc(var(--bs-gutter-y)*-1);margin-right:calc(var(--bs-gutter-x)*-.5);margin-left:calc(var(--bs-gutter-x)*-.5)}";
+  resources += ".col{flex:1 0 0%}.col-md-3{flex:0 0 auto;width:25%}.col-md-6{flex:0 0 auto;width:50%}.col-md-9{flex:0 0 auto;width:75%}";
+  resources += ".card{position:relative;display:flex;flex-direction:column;min-width:0;word-wrap:break-word;background-color:#fff;background-clip:border-box;border:1px solid rgba(0,0,0,.125);border-radius:.375rem}";
+  resources += ".card-body{flex:1 1 auto;padding:1rem}.card-header{padding:.5rem 1rem;margin-bottom:0;background-color:rgba(0,0,0,.03);border-bottom:1px solid rgba(0,0,0,.125)}";
+  resources += ".btn{display:inline-block;font-weight:400;line-height:1.5;color:#212529;text-align:center;text-decoration:none;vertical-align:middle;cursor:pointer;user-select:none;background-color:transparent;border:1px solid transparent;padding:.375rem .75rem;font-size:1rem;border-radius:.375rem;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out}";
+  resources += ".btn-primary{color:#fff;background-color:#0d6efd;border-color:#0d6efd}.btn-primary:hover{color:#fff;background-color:#0b5ed7;border-color:#0a58ca}";
+  resources += ".btn-secondary{color:#fff;background-color:#6c757d;border-color:#6c757d}.btn-secondary:hover{color:#fff;background-color:#5c636a;border-color:#565e64}";
+  resources += ".btn-success{color:#fff;background-color:#198754;border-color:#198754}.btn-success:hover{color:#fff;background-color:#157347;border-color:#146c43}";
+  resources += ".btn-danger{color:#fff;background-color:#dc3545;border-color:#dc3545}.btn-danger:hover{color:#fff;background-color:#bb2d3b;border-color:#b02a37}";
+  resources += ".btn-warning{color:#000;background-color:#ffc107;border-color:#ffc107}.btn-warning:hover{color:#000;background-color:#ffca2c;border-color:#ffc720}";
+  resources += ".btn-info{color:#000;background-color:#0dcaf0;border-color:#0dcaf0}.btn-info:hover{color:#000;background-color:#31d2f2;border-color:#25cff2}";
+  resources += ".navbar{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;padding-top:.5rem;padding-bottom:.5rem}";
+  resources += ".navbar-dark{--bs-navbar-color:rgba(255,255,255,.55);--bs-navbar-hover-color:rgba(255,255,255,.75);--bs-navbar-disabled-color:rgba(255,255,255,.25);--bs-navbar-active-color:#fff;--bs-navbar-brand-color:#fff;--bs-navbar-brand-hover-color:#fff}";
+  resources += ".bg-dark{--bs-bg-opacity:1;background-color:rgba(var(--bs-dark-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".table{--bs-table-bg:transparent;--bs-table-accent-bg:transparent;--bs-table-striped-color:#212529;--bs-table-striped-bg:rgba(0,0,0,.05);--bs-table-active-color:#212529;--bs-table-active-bg:rgba(0,0,0,.1);--bs-table-hover-color:#212529;--bs-table-hover-bg:rgba(0,0,0,.075);width:100%;margin-bottom:1rem;color:#212529;vertical-align:top;border-color:#dee2e6}";
+  resources += ".table>:not(caption)>*>*{padding:.5rem .5rem;background-color:var(--bs-table-bg);border-bottom-width:1px;box-shadow:inset 0 0 0 9999px var(--bs-table-accent-bg)}";
+  resources += ".table-striped>tbody>tr:nth-of-type(odd)>td,.table-striped>tbody>tr:nth-of-type(odd)>th{--bs-table-accent-bg:var(--bs-table-striped-bg);color:var(--bs-table-striped-color)}";
+  resources += ".table-hover>tbody>tr:hover>td,.table-hover>tbody>tr:hover>th{--bs-table-accent-bg:var(--bs-table-hover-bg);color:var(--bs-table-hover-color)}";
+  resources += ".badge{display:inline-block;padding:.35em .65em;font-size:.75em;font-weight:700;line-height:1;color:#fff;text-align:center;white-space:nowrap;vertical-align:baseline;border-radius:.375rem}";
+  resources += ".bg-success{--bs-bg-opacity:1;background-color:rgba(var(--bs-success-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".bg-danger{--bs-bg-opacity:1;background-color:rgba(var(--bs-danger-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".bg-warning{--bs-bg-opacity:1;background-color:rgba(var(--bs-warning-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".bg-info{--bs-bg-opacity:1;background-color:rgba(var(--bs-info-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".bg-primary{--bs-bg-opacity:1;background-color:rgba(var(--bs-primary-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".text-muted{--bs-text-opacity:1;color:#6c757d!important}";
+  resources += ".text-center{text-align:center!important}";
+  resources += ".mt-3{margin-top:1rem!important}.mt-4{margin-top:1.5rem!important}.mb-3{margin-bottom:1rem!important}";
+  resources += ".d-flex{display:flex!important}.justify-content-between{justify-content:space-between!important}.align-items-center{align-items:center!important}";
+  resources += ".form-label{margin-bottom:.5rem}.form-control{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;background-image:none;border:1px solid #ced4da;appearance:none;border-radius:.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}";
+  resources += ".form-select{display:block;width:100%;padding:.375rem 2.25rem .375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;border:1px solid #ced4da;border-radius:.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out;appearance:none}";
+  resources += ".modal{position:fixed;top:0;left:0;z-index:1055;display:none;width:100%;height:100%;overflow-x:hidden;overflow-y:auto;outline:0}";
+  resources += ".modal-dialog{position:relative;width:auto;margin:.5rem;pointer-events:none}";
+  resources += ".modal-content{position:relative;display:flex;flex-direction:column;width:100%;pointer-events:auto;background-color:#fff;background-clip:padding-box;border:1px solid rgba(0,0,0,.2);border-radius:.3rem;outline:0}";
+  resources += ".modal-header{display:flex;flex-shrink:0;align-items:center;justify-content:space-between;padding:1rem 1rem;border-bottom:1px solid #dee2e6;border-top-left-radius:calc(.3rem - 1px);border-top-right-radius:calc(.3rem - 1px)}";
+  resources += ".modal-body{position:relative;flex:1 1 auto;padding:1rem}";
+  resources += ".modal-footer{display:flex;flex-wrap:wrap;flex-shrink:0;align-items:center;justify-content:flex-end;padding:.75rem;border-top:1px solid #dee2e6;border-bottom-right-radius:calc(.3rem - 1px);border-bottom-left-radius:calc(.3rem - 1px)}";
+  
+  // Roboto font fallback
+  resources += "body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}";
+  
+  resources += "</style>";
+  
+  // Basic Bootstrap JavaScript functionality (minimal modal support)
+  resources += "<script>";
+  resources += "class Modal{constructor(e){this.element=e,this.isShown=!1}show(){this.isShown||(this.element.style.display='block',this.element.classList.add('show'),this.isShown=!0,document.body.style.overflow='hidden')}hide(){this.isShown&&(this.element.style.display='none',this.element.classList.remove('show'),this.isShown=!1,document.body.style.overflow='')}static getInstance(e){return e._modalInstance||(e._modalInstance=new Modal(e)),e._modalInstance}}";
+  resources += "window.bootstrap={Modal:Modal};";
+  resources += "document.addEventListener('click',function(e){if(e.target.matches('[data-bs-dismiss=\"modal\"]')){const modal=e.target.closest('.modal');if(modal){const instance=Modal.getInstance(modal);instance.hide()}}});";
+  resources += "</script>";
+  
+  return resources;
+}
+
+// Manual time setting HTML popup
+String getManualTimeSetHTML() {
+  String html = "<!DOCTYPE html><html><head><title>Set Time & Date</title>";
+  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+  
+  if (checkInternetConnectivity()) {
+    html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  } else {
+    html += getLocalResources();
+  }
+  
+  html += "<style>";
+  html += "body{background-color:#f8f9fa;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;}";
+  html += ".time-container{max-width:500px;margin:2rem auto;padding:2rem;background:#fff;border-radius:8px;box-shadow:0 0 15px rgba(0,0,0,0.1);}";
+  html += ".form-group{margin-bottom:1rem;}";
+  html += "</style>";
+  html += "</head><body>";
+  
+  html += "<div class='time-container'>";
+  html += "<h2 class='text-center mb-4'>Manual Time & Date Setting</h2>";
+  
+  // Get current time for form defaults
+  time_t now = time(nullptr);
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+  
+  char dateStr[11], timeStr[6];
+  strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", &timeinfo);
+  strftime(timeStr, sizeof(timeStr), "%H:%M", &timeinfo);
+  
+  html += "<form method='POST' action='/manual_time_set'>";
+  html += "<div class='form-group'>";
+  html += "<label for='date' class='form-label'>Date:</label>";
+  html += "<input type='date' class='form-control' id='date' name='date' value='" + String(dateStr) + "' required>";
+  html += "</div>";
+  html += "<div class='form-group'>";
+  html += "<label for='time' class='form-label'>Time:</label>";
+  html += "<input type='time' class='form-control' id='time' name='time' value='" + String(timeStr) + "' required>";
+  html += "</div>";
+  html += "<div class='form-group'>";
+  html += "<label for='timezone' class='form-label'>Timezone Offset (hours):</label>";
+  html += "<select class='form-select' id='timezone' name='timezone'>";
+  html += "<option value='0'>GMT (UTC+0)</option>";
+  html += "<option value='1' selected>BST (UTC+1)</option>";
+  html += "<option value='-5'>EST (UTC-5)</option>";
+  html += "<option value='-4'>EDT (UTC-4)</option>";
+  html += "<option value='-8'>PST (UTC-8)</option>";
+  html += "<option value='-7'>PDT (UTC-7)</option>";
+  html += "</select>";
+  html += "</div>";
+  html += "<div class='d-flex justify-content-between'>";
+  html += "<button type='submit' class='btn btn-primary'>Set Time</button>";
+  html += "<button type='button' class='btn btn-secondary' onclick='window.close()'>Cancel</button>";
+  html += "</div>";
+  html += "</form>";
+  html += "</div>";
+  
+  if (checkInternetConnectivity()) {
+    html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  }
+  
+  html += "</body></html>";
+  return html;
+}
+
+// Handle manual time setting
+void handleManualTimeSet() {
+  if (server.method() != HTTP_POST) {
+    server.send(405, "text/plain", "Method Not Allowed");
+    return;
+  }
+  
+  if (!server.hasArg("date") || !server.hasArg("time")) {
+    server.send(400, "text/plain", "Missing date or time parameter");
+    return;
+  }
+  
+  String dateStr = server.arg("date");
+  String timeStr = server.arg("time");
+  int timezoneOffset = server.hasArg("timezone") ? server.arg("timezone").toInt() : 0;
+  
+  // Parse date (YYYY-MM-DD)
+  int year = dateStr.substring(0, 4).toInt();
+  int month = dateStr.substring(5, 7).toInt();
+  int day = dateStr.substring(8, 10).toInt();
+  
+  // Parse time (HH:MM)
+  int hour = timeStr.substring(0, 2).toInt();
+  int minute = timeStr.substring(3, 5).toInt();
+  
+  // Create tm structure
+  struct tm timeStruct = {0};
+  timeStruct.tm_year = year - 1900;
+  timeStruct.tm_mon = month - 1;
+  timeStruct.tm_mday = day;
+  timeStruct.tm_hour = hour;
+  timeStruct.tm_min = minute;
+  timeStruct.tm_sec = 0;
+  
+  // Convert to time_t and adjust for timezone
+  time_t newTime = mktime(&timeStruct) - (timezoneOffset * 3600);
+  
+  // Set system time
+  struct timeval tv;
+  tv.tv_sec = newTime;
+  tv.tv_usec = 0;
+  settimeofday(&tv, NULL);
+  
+  Serial.printf("Manual time set: %s %s (UTC%+d)\n", dateStr.c_str(), timeStr.c_str(), timezoneOffset);
+  
+  String response = "<!DOCTYPE html><html><head><title>Time Set</title>";
+  if (checkInternetConnectivity()) {
+    response += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  } else {
+    response += getLocalResources();
+  }
+  response += "</head><body class='bg-light'>";
+  response += "<div class='container mt-5'><div class='card mx-auto' style='max-width:400px;'>";
+  response += "<div class='card-body text-center'>";
+  response += "<h5 class='card-title'>Time Set Successfully</h5>";
+  response += "<p class='card-text'>Device time has been updated to " + dateStr + " " + timeStr + "</p>";
+  response += "<button class='btn btn-primary' onclick='window.close()'>Close</button>";
+  response += "</div></div></div>";
+  response += "</body></html>";
+  
+  server.send(200, "text/html", response);
+}
