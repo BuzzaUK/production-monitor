@@ -2625,67 +2625,280 @@ document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 }
 
 String htmlAnalyticsCompare() {
-  String html = "<!DOCTYPE html><html lang='en'><head><title>Compare Assets</title>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
-  html += "<style>";
-  html += "body{background-color:#f8f9fa;font-family:Roboto,Arial,sans-serif;}";
-  html += ".leaderboard-badge{font-size:1.4em;margin-right:0.5em;}";
-  html += ".leaderboard-row{background:linear-gradient(90deg,#f8ffec,#e6f2ff);border-radius:16px;box-shadow:0 2px 8px #0001;margin-bottom:11px;padding:12px 20px;display:flex;align-items:center;}";
-  html += ".leaderboard-row.top{background:linear-gradient(90deg,#fffbe6,#ffe5ec);border:2px solid #ffd700;}";
-  html += ".leaderboard-row .asset-name{font-weight:700;font-size:1.15em;flex:1;}";
-  html += ".kpi-cards{display:flex;gap:1em;flex-wrap:wrap;justify-content:center;margin-bottom:24px;}";
-  html += ".kpi-card{background:#fff;flex:1 1 160px;min-width:140px;border-radius:10px;box-shadow:0 1px 5px #0002;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px 10px 12px 10px;}";
-  html += ".kpi-card .kpi-icon{font-size:2em;margin-bottom:5px;}";
-  html += ".kpi-card .kpi-label{color:#888;font-size:0.93em;}";
-  html += ".asset-of-day{background:linear-gradient(90deg,#e0ffe0 60%,#fffbe6 100%);border-left:8px solid #4caf50;font-size:1.05em;padding:12px 16px;margin-bottom:18px;border-radius:6px;}";
-  html += ".bar-charts-row{display:flex;flex-wrap:wrap;gap:1.5em;}";
-  html += ".bar-charts-row .chart-col{flex:1 1 340px;min-width:320px;}";
-  html += "</style>";
-  html += "</head><body>";
-
-  html += "<nav class='navbar navbar-expand-lg navbar-dark bg-dark shadow-sm'>";
-  html += "<div class='container-fluid'>";
-  html += "  <a class='navbar-brand' href='/'>Asset Availability</a>";
-  html += "  <button class='navbar-toggler' type='button' data-bs-toggle='collapse' data-bs-target='#navbarNav'><span class='navbar-toggler-icon'></span></button>";
-  html += "  <div class='collapse navbar-collapse' id='navbarNav'>";
-  html += "    <ul class='navbar-nav ms-auto'>";
-  html += "      <li class='nav-item'><a class='nav-link' href='/'>Dashboard</a></li>";
-  html += "      <li class='nav-item'><a class='nav-link' href='/events'>Event Log</a></li>";
-  html += "      <li class='nav-item'><a class='nav-link active' href='/analytics-compare'>Compare Assets</a></li>";
-  html += "      <li class='nav-item'><a class='nav-link' href='/config'>Setup</a></li>";
-  html += "    </ul>";
-  html += "  </div>";
+  String html = getCommonHeader("Compare Assets", "compare");
+  
+  html += "<div class='container'>";
+  html += "<h2 style='margin-bottom: 1.5rem; color: #2563eb;'>Asset Performance Comparison</h2>";
+  
+  html += "<div id='assetOfDay' style='background: #dcfce7; color: #166534; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; display: none;'></div>";
+  
+  html += "<div id='leaderboard' class='mb-3'></div>";
+  
+  html += "<div class='kpi-grid' id='kpiCards'></div>";
+  
+  html += "<div class='row'>";
+  html += "<div class='col-6'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Availability Comparison</div>";
+  html += "<div class='card-body'>";
+  html += "<div class='chart-container'><canvas id='barAvail'></canvas></div>";
   html += "</div>";
-  html += "</nav>";
-
-  html += "<div class='container-fluid mt-4' style='max-width:1600px;'>";
-  html += "<div id='assetOfDay' class='asset-of-day mb-3'></div>";
-  html += "<div id='leaderboard'></div>";
-  html += "<div class='kpi-cards' id='kpiCards'></div>";
-
-  html += "<div class='bar-charts-row'>";
-  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barAvail' height='220'></canvas></div></div></div>";
-  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barStops' height='220'></canvas></div></div></div>";
-  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barMTBF' height='220'></canvas></div></div></div>";
-  html += "  <div class='chart-col'><div class='card mb-3'><div class='card-body'><canvas id='barReasons' height='220'></canvas></div></div></div>";
   html += "</div>";
-
-  html += "<div class='card mt-3 shadow-sm'><div class='card-header'><h4>Last Event Log Summary</h4></div><div class='card-body table-responsive'>";
-  html += "  <table class='table table-striped table-hover'><thead><tr><th>Asset</th><th>Availability (%)</th><th>Runtime</th><th>Downtime</th><th>Stops</th><th>MTBF</th><th>MTTR</th></tr></thead><tbody id='compareTable'></tbody></table>";
-  html += "</div></div>";
   html += "</div>";
-
+  
+  html += "<div class='col-6'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Stop Count Comparison</div>";
+  html += "<div class='card-body'>";
+  html += "<div class='chart-container'><canvas id='barStops'></canvas></div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='row mt-3'>";
+  html += "<div class='col-6'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>MTBF Comparison (minutes)</div>";
+  html += "<div class='card-body'>";
+  html += "<div class='chart-container'><canvas id='barMTBF'></canvas></div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='col-6'>";
+  html += "<div class='card'>";
+  html += "<div class='card-header'>Summary Table</div>";
+  html += "<div class='card-body'>";
+  html += "<div style='overflow-x: auto;'>";
+  html += "<table class='table table-striped table-hover'>";
+  html += "<thead><tr><th>Asset</th><th>Availability</th><th>Runtime</th><th>Downtime</th><th>Stops</th><th>MTBF</th><th>MTTR</th></tr></thead>";
+  html += "<tbody id='compareTable'></tbody></table>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "</div>";
+  
+  html += getChartJS();
+  html += getCommonJS();
   html += "<script>";
   html += R"rawliteral(
-let allEventsCompare = [], allAssetNamesCompare = [], configDowntimeReasonsCompare = [];
+// Simplified Asset Comparison for ESP32 Memory Efficiency
 
-function fetchCompareDataPage() {
-  fetch('/api/config').then(e => e.json()).then(configData => {
-    configDowntimeReasonsCompare = configData.downtimeReasons || [];
+let allAssets = [];
+let allEvents = [];
+let charts = {};
+
+function initializeComparison() {
+  loadComparisonData();
+}
+
+function loadComparisonData() {
+  Promise.all([
+    fetch('/api/summary').then(r => r.json()),
+    fetch('/api/events').then(r => r.json())
+  ]).then(([summary, events]) => {
+    allAssets = summary.assets || [];
+    allEvents = events || [];
+    
+    updateLeaderboard();
+    updateKPICards();
+    updateCharts();
+    updateTable();
+    updateAssetOfDay();
+    
+  }).catch(e => {
+    console.error('Error loading comparison data:', e);
+  });
+}
+
+function updateLeaderboard() {
+  const leaderboard = document.getElementById('leaderboard');
+  if (!leaderboard) return;
+  
+  const sorted = allAssets.slice().sort((a, b) => b.availability - a.availability);
+  let html = '';
+  
+  sorted.forEach((asset, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+    const bgClass = i === 0 ? 'style="background: linear-gradient(90deg, #dcfce7, #dbeafe); border: 2px solid #10b981; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;"' : 'style="background: #f9fafb; padding: 1rem; border-radius: 6px; margin-bottom: 0.5rem;"';
+    
+    html += `
+      <div ${bgClass}>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <span style="font-size: 1.2rem; font-weight: bold;">${medal}</span>
+          <span style="flex: 1; font-weight: 600;">${asset.name}</span>
+          <span>Availability: <strong>${asset.availability.toFixed(2)}%</strong></span>
+          <span style="margin-left: 1rem;">Stops: <strong>${asset.stop_count}</strong></span>
+        </div>
+      </div>
+    `;
+  });
+  
+  leaderboard.innerHTML = html;
+}
+
+function updateKPICards() {
+  const kpiDiv = document.getElementById('kpiCards');
+  if (!kpiDiv) return;
+  
+  const topAvailability = Math.max(...allAssets.map(a => a.availability));
+  const totalStops = allAssets.reduce((sum, a) => sum + a.stop_count, 0);
+  const avgMTBF = allAssets.length > 0 ? 
+    allAssets.reduce((sum, a) => sum + a.mtbf, 0) / allAssets.length : 0;
+  const avgAvailability = allAssets.length > 0 ?
+    allAssets.reduce((sum, a) => sum + a.availability, 0) / allAssets.length : 0;
+
+  kpiDiv.innerHTML = `
+    <div class="kpi-card">
+      <div class="value">${topAvailability.toFixed(1)}%</div>
+      <div class="label">Top Availability</div>
+    </div>
+    <div class="kpi-card">
+      <div class="value">${avgAvailability.toFixed(1)}%</div>
+      <div class="label">Average Availability</div>
+    </div>
+    <div class="kpi-card">
+      <div class="value">${totalStops}</div>
+      <div class="label">Total Stops</div>
+    </div>
+    <div class="kpi-card">
+      <div class="value">${formatDuration(avgMTBF * 60)}</div>
+      <div class="label">Avg MTBF</div>
+    </div>
+  `;
+}
+
+function updateCharts() {
+  const labels = allAssets.map(a => a.name);
+  const availData = allAssets.map(a => a.availability);
+  const stopsData = allAssets.map(a => a.stop_count);
+  const mtbfData = allAssets.map(a => a.mtbf);
+
+  // Availability Chart
+  const availCanvas = document.getElementById('barAvail');
+  if (availCanvas) {
+    if (charts.availability) {
+      charts.availability.data.labels = labels;
+      charts.availability.data.datasets[0].data = availData;
+      charts.availability.update();
+    } else {
+      charts.availability = new Chart(availCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Availability %',
+            data: availData,
+            backgroundColor: '#10b981'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+  }
+
+  // Stops Chart
+  const stopsCanvas = document.getElementById('barStops');
+  if (stopsCanvas) {
+    if (charts.stops) {
+      charts.stops.data.labels = labels;
+      charts.stops.data.datasets[0].data = stopsData;
+      charts.stops.update();
+    } else {
+      charts.stops = new Chart(stopsCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Total Stops',
+            data: stopsData,
+            backgroundColor: '#ef4444'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+  }
+
+  // MTBF Chart
+  const mtbfCanvas = document.getElementById('barMTBF');
+  if (mtbfCanvas) {
+    if (charts.mtbf) {
+      charts.mtbf.data.labels = labels;
+      charts.mtbf.data.datasets[0].data = mtbfData;
+      charts.mtbf.update();
+    } else {
+      charts.mtbf = new Chart(mtbfCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'MTBF (min)',
+            data: mtbfData,
+            backgroundColor: '#2563eb'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+  }
+}
+
+function updateTable() {
+  const tbody = document.getElementById('compareTable');
+  if (!tbody) return;
+  
+  let html = '';
+  allAssets.forEach(asset => {
+    html += `
+      <tr>
+        <td><strong>${asset.name}</strong></td>
+        <td>${asset.availability.toFixed(2)}%</td>
+        <td>${formatDuration(asset.total_runtime * 60)}</td>
+        <td>${formatDuration(asset.total_downtime * 60)}</td>
+        <td>${asset.stop_count}</td>
+        <td>${formatDuration(asset.mtbf * 60)}</td>
+        <td>${formatDuration(asset.mttr * 60)}</td>
+      </tr>
+    `;
+  });
+  
+  tbody.innerHTML = html;
+}
+
+// Update Asset of the Day
+function updateAssetOfDay() {
+  const container = document.getElementById('assetOfDay');
+  if (!container || allAssets.length === 0) return;
+  
+  const best = allAssets.reduce((prev, current) => 
+    current.availability > prev.availability ? current : prev
+  );
+  
+  if (best.availability > 0) {
+    container.innerHTML = `🌟 <strong>Asset of the Day:</strong> <span style="color: #166534; font-weight: 700;">${best.name}</span> with <span style="color: #166534;">${best.availability.toFixed(2)}% Availability</span>`;
+    container.style.display = 'block';
+  }
+}
+
+// Auto-refresh every 30 seconds
+setInterval(loadComparisonData, 30000);
+
+// Initialize
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeComparison);
+} else {
+  initializeComparison();
+}
+)rawliteral";
+  html += "</script>";
+  html += "</body></html>";
+  return html;
+}
     allAssetNamesCompare = configData.assets.map(e => e.name);
     
     // --- SIM PATCH: Added cache-busting parameter ---
@@ -2837,54 +3050,126 @@ document.readyState === "loading" ? document.addEventListener("DOMContentLoaded"
 //  Events Page Function
 // ------------------------------------------------------------------------------------------------------------------------------------
 void sendHtmlEventsPage() {
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", ""); // Send headers
-
-  // --- Start of HTML Document ---
-  server.sendContent("<!DOCTYPE html><html lang='en'><head><title>Event Log</title>");
-  server.sendContent("<meta name='viewport' content='width=device-width,initial-scale=1'>");
-  server.sendContent("<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>");
-  server.sendContent("<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>");
-
-  // --- ENHANCED CSS ---
-  server.sendContent("<style>");
-  server.sendContent("body{background-color:#f8f9fa;font-family:Roboto,Arial,sans-serif;}");
-  server.sendContent(".table { width: 100%; min-width: 1200px; }");
-  server.sendContent(".table th, .table td { padding-left: 18px; padding-right: 18px; padding-top: 14px; padding-bottom: 14px; }");
-  server.sendContent(".stops-col, .stops-col td { text-align: center !important; }");
-  server.sendContent(".table .note-col { max-width: 250px; white-space: normal; word-break: break-word; }");
-  server.sendContent(".table .action-col { width: 1%; white-space: nowrap; text-align: center; }");
-
-  // Row coloring classes
-  server.sendContent(".table-row-stop { background-color: rgba(220, 53, 69, 0.08) !important; }"); // Faint red
-  server.sendContent(".table-row-start { background-color: rgba(25, 135, 84, 0.10) !important; }"); // Faint green
-  server.sendContent(".table-row-system { background-color: rgba(13, 202, 240, 0.11) !important; }"); // Faint cyan/blue
-  server.sendContent(".evt-type { font-weight: bold; }");
-  server.sendContent(".evt-type.START { color: #198754; }");
-  server.sendContent(".evt-type.STOP { color: #dc3545; }");
-  server.sendContent(".evt-type.SYS_START,.evt-type.SYS_STOP,.evt-type.SHIFT_TRANSITION { color: #0dcaf0; }");
-  server.sendContent(".table th { position: sticky; top: 0; background: #0366d6; color: #fff; z-index: 2; }");
-  server.sendContent(".table th[title] { cursor: help; border-bottom: 2px dotted #fff; }");
-  server.sendContent(".note-col { font-size: 0.97em; color: #555; }");
-  server.sendContent(".legend-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:middle;}");
+  String html = getCommonHeader("Event Log", "events");
   
-  // Mobile card styling
-  server.sendContent("@media (max-width:700px){ #eventTable{display:none;} .event-card{margin-bottom:0.8rem; border-left-width: 5px;} .event-card-stop{border-left-color: #dc3545;} .event-card-start{border-left-color:#198754;} .event-card-system{border-left-color:#0dcaf0;} }");
-  server.sendContent("@media (min-width:701px){#mobileEvents{display:none;}}");
-  server.sendContent("</style></head>");
-
-  // --- Body, Navbar, and Page Structure ---
-  server.sendContent("<body>");
-  String navHtml = "<nav class='navbar navbar-expand-lg navbar-dark bg-dark shadow-sm'>"
-                   "<div class='container-fluid'>"
-                   "<a class='navbar-brand' href='/'>Asset Availability</a>"
-                   "<button class='navbar-toggler' type='button' data-bs-toggle='collapse' data-bs-target='#navbarNav'><span class='navbar-toggler-icon'></span></button>"
-                   "<div class='collapse navbar-collapse' id='navbarNav'>"
-                   "<ul class='navbar-nav ms-auto'>"
-                   "<li class='nav-item'><a class='nav-link' href='/'>Dashboard</a></li>"
-                   "<li class='nav-item'><a class='nav-link active' href='/events'>Event Log</a></li>"
-                   "<li class='nav-item'><a class='nav-link' href='/analytics-compare'>Compare Assets</a></li>"
-                   "<li class='nav-item'><a class='nav-link' href='/config'>Setup</a></li>"
+  html += "<div class='container'>";
+  html += "<h2 style='margin-bottom: 1.5rem; color: #2563eb;'>Event Log</h2>";
+  
+  // Legend
+  html += "<div class='legend mb-3'>";
+  html += "<div class='legend-item'><div class='legend-dot legend-start'></div>Start Events</div>";
+  html += "<div class='legend-item'><div class='legend-dot legend-stop'></div>Stop Events</div>";
+  html += "<div class='legend-item'><div class='legend-dot legend-system'></div>System Events</div>";
+  html += "<div style='margin-left: auto; color: #6b7280; font-size: 0.9rem;'>Hover column headers for explanations</div>";
+  html += "</div>";
+  
+  // Filters and controls
+  html += "<div class='row mb-3'>";
+  html += "<div class='col-3'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Filter by Asset:</label>";
+  html += "<select id='channelFilter' class='form-control'>";
+  html += "<option value='ALL' selected>All Assets</option>";
+  html += "</select>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='col-3'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Event State:</label>";
+  html += "<select id='stateFilter' class='form-control'>";
+  html += "<option value='ALL'>All</option>";
+  html += "<option value='RUNNING'>Up / Running</option>";
+  html += "<option value='STOPPED'>Down / Stopped</option>";
+  html += "</select>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='col-2'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>&nbsp;</label>";
+  html += "<button class='btn btn-secondary w-full' id='scrollBtn' onclick='toggleScrollInhibit(this)'>Pause Scroll</button>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='col-2'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>&nbsp;</label>";
+  html += "<a href='/export_log' class='btn btn-primary w-full'>Export CSV</a>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='col-2'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>&nbsp;</label>";
+  html += "<a href='/shiftlogs_page' class='btn btn-secondary w-full'>View Archive</a>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  // Event count and table
+  html += "<div class='card'>";
+  html += "<div class='card-header'>";
+  html += "<div style='display: flex; justify-content: space-between; align-items: center;'>";
+  html += "<span>Events</span>";
+  html += "<div id='eventCount' style='color: #6b7280; font-size: 0.9rem;'></div>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div class='card-body' style='padding: 0;'>";
+  html += "<div style='overflow-x: auto; max-height: 600px; overflow-y: auto;'>";
+  html += "<table id='eventTable' class='table table-striped table-hover' style='margin: 0;'>";
+  html += "<thead>";
+  html += "<tr>";
+  html += "<th title='Event date (DD/MM/YYYY)'>Date</th>";
+  html += "<th title='Event time (HH:MM:SS)'>Time</th>";
+  html += "<th title='Asset involved in the event'>Asset</th>";
+  html += "<th title='Event type (START, STOP, SYSTEM, SHIFT)'>Type</th>";
+  html += "<th title='Current machine state after event'>State</th>";
+  html += "<th title='Availability % (uptime/(uptime+downtime))'>Avail&nbsp;(%)</th>";
+  html += "<th title='Total runtime this period (minutes)'>Runtime</th>";
+  html += "<th title='Total downtime this period (minutes)'>Downtime</th>";
+  html += "<th title='Mean Time Between Failures (minutes)'>MTBF</th>";
+  html += "<th title='Mean Time To Repair (minutes)'>MTTR</th>";
+  html += "<th title='Number of stops' style='text-align: center;'>Stops</th>";
+  html += "<th title='Duration of this run (mm:ss)'>Run&nbsp;Dur</th>";
+  html += "<th title='Duration of this stop (mm:ss)'>Stop&nbsp;Dur</th>";
+  html += "<th title='User note or system message' style='max-width: 200px;'>Note</th>";
+  html += "<th style='width: 50px;'></th>";
+  html += "</tr>";
+  html += "</thead>";
+  html += "<tbody id='tbody'></tbody>";
+  html += "</table>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='text-center mt-2'>";
+  html += "<span class='last-updated' style='color: #6b7280; font-size: 0.8rem;'></span>";
+  html += "</div>";
+  
+  html += "</div>";
+  
+  // Modal for editing notes
+  html += "<div id='noteEditModal' style='display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;'>";
+  html += "<div style='position: relative; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; max-width: 500px; width: 90%;'>";
+  html += "<h3 style='margin: 0 0 1.5rem 0;'>Edit Event Note</h3>";
+  html += "<form id='modalNoteForm' onsubmit='return submitModalNote(event)'>";
+  html += "<input type='hidden' id='modalNoteDate' name='date'>";
+  html += "<input type='hidden' id='modalNoteTime' name='time'>";
+  html += "<input type='hidden' id='modalNoteAsset' name='asset'>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Reason:</label>";
+  html += "<select id='modalNoteReason' name='reason' class='form-control'></select>";
+  html += "</div>";
+  html += "<div class='form-group'>";
+  html += "<label class='form-label'>Additional Note:</label>";
+  html += "<input type='text' id='modalNoteText' name='note' class='form-control' maxlength='64' placeholder='Add custom details...'>";
+  html += "</div>";
+  html += "<div style='display: flex; gap: 1rem; margin-top: 1.5rem;'>";
+  html += "<button type='button' class='btn btn-secondary' onclick='hideNoteModal()'>Cancel</button>";
+  html += "<button type='submit' class='btn btn-primary'>Save Note</button>";
+  html += "</div>";
+  html += "</form>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += getCommonJS();
                    "</ul></div></div></nav>";
   server.sendContent(navHtml);
 
