@@ -1265,7 +1265,7 @@ String htmlConfig() {
   html += "        <div class='card-header bg-light'><h3 class='mb-0'>Configuration</h3></div>";
   html += "        <div class='card-body'>";
   html += "          <div id='saveNotice' class='alert alert-success' style='display:none;'>Settings saved! Device is rebooting...</div>";
-  html += "          <form method='POST' action='/save_config' id='setupform' onsubmit='setTimeout(() => { const notice = document.getElementById(\"saveNotice\"); if(notice) notice.style.display=\"block\"; }, 500);'>";
+  html += "          <form method='POST' action='/save_config' id='setupform' onsubmit='setTimeout(function() { const notice = document.getElementById(\"saveNotice\"); if(notice) notice.style.display=\"block\"; }, 500);'>";
   html += "            <div class='accordion' id='configAccordion'>";
   
   html += "              <div class='accordion-item'>";
@@ -1347,7 +1347,9 @@ String htmlConfig() {
       const num = parseInt(numShiftsStr, 10);
       const container = document.getElementById('shiftTimeInputsContainer');
       container.innerHTML = '';
-      const maxShifts = )rawliteral" + String(MAX_CONFIGURABLE_SHIFTS) + R"rawliteral(;
+      const maxShifts = )rawliteral";
+  html += String(MAX_CONFIGURABLE_SHIFTS);
+  html += R"rawliteral(;
       if (isNaN(num) || num < 1 || num > maxShifts) { return; }
       for (let i = 0; i < num; i++) {
         const shiftDiv = document.createElement('div');
