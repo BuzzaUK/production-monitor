@@ -208,28 +208,61 @@ bool deleteOldestLogFile() {
 }
 
 String wifiConfigHTML() {
-  String html = "<!DOCTYPE html><html><head><title>WiFi Setup</title>"
+  String html = "<!DOCTYPE html><html><head><title>WiFi Setup - Production Monitor</title>"
                 "<meta charset='UTF-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
                 "<style>"
-                // ... styles ...
-                ".localap-btn { background: #f39c12; color: #fff; border: none; padding: 0.7em 1.5em; border-radius: 4px; margin-top:2em; cursor:pointer; width:100%; }"
+                "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }"
+                ".container { background: #fff; border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 2.5rem; max-width: 450px; width: 90%; margin: 20px; }"
+                "h1 { text-align: center; color: #333; margin-bottom: 1.5rem; font-size: 1.8rem; font-weight: 600; }"
+                ".form-group { margin-bottom: 1.5rem; }"
+                "label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: 500; font-size: 0.95rem; }"
+                "input[type='text'], input[type='password'] { width: 100%; padding: 0.8rem; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 1rem; transition: border-color 0.3s ease, box-shadow 0.3s ease; box-sizing: border-box; }"
+                "input[type='text']:focus, input[type='password']:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }"
+                "input[type='submit'] { width: 100%; padding: 0.9rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.3s ease; }"
+                "input[type='submit']:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3); }"
+                ".localap-btn { width: 100%; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: #fff; border: none; padding: 0.9rem; border-radius: 8px; margin-top: 1rem; cursor: pointer; font-size: 1rem; font-weight: 600; transition: transform 0.2s ease, box-shadow 0.3s ease; }"
+                ".localap-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(243, 156, 18, 0.3); }"
+                ".note { background: #f8f9fa; border-left: 4px solid #667eea; padding: 1rem; border-radius: 4px; margin: 1.5rem 0; color: #666; font-size: 0.9rem; line-height: 1.5; }"
+                ".divider { text-align: center; margin: 2rem 0; position: relative; color: #999; font-size: 0.9rem; }"
+                ".divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e1e5e9; z-index: 1; }"
+                ".divider span { background: #fff; padding: 0 1rem; position: relative; z-index: 2; }"
+                ".status-info { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; color: #0d47a1; font-size: 0.9rem; }"
+                ".device-info { text-align: center; margin-bottom: 1.5rem; }"
+                ".device-info h2 { color: #667eea; font-size: 1.3rem; margin-bottom: 0.5rem; }"
+                ".device-info p { color: #666; font-size: 0.9rem; margin: 0; }"
+                "@media (max-width: 480px) { .container { padding: 1.5rem; margin: 10px; } h1 { font-size: 1.5rem; } }"
                 "</style>"
                 "</head><body>"
+                "<div class='container'>"
+                "<div class='device-info'>"
+                "<h2>Production Monitor</h2>"
+                "<p>Asset Monitoring System Configuration</p>"
+                "</div>"
+                "<div class='status-info'>"
+                "📡 Device is in Access Point mode. Configure WiFi to connect to your network or run locally."
+                "</div>"
                 "<form method='POST' action='/wifi_save_config'>"
-                "<h1>WiFi Setup</h1>"
-                "<label>SSID:</label>"
-                "<input type='text' name='ssid' maxlength='32' required value='";
+                "<h1>WiFi Network Setup</h1>"
+                "<div class='form-group'>"
+                "<label>Network Name (SSID):</label>"
+                "<input type='text' name='ssid' maxlength='32' required placeholder='Enter WiFi network name' value='";
   html += wifi_ssid;
-  html += "'>"
-          "<label>Password:</label>"
-          "<input type='password' name='password' maxlength='64' value='";
+  html += "'></div>"
+          "<div class='form-group'>"
+          "<label>Network Password:</label>"
+          "<input type='password' name='password' maxlength='64' placeholder='Enter WiFi password' value='";
   html += wifi_pass;
-  html += "'>"
-          "<div class='note'>Enter your WiFi details above. Device will reboot after saving.</div>"
-          "<input type='submit' value='Save & Reboot'>"
-          "</form>";
-  html += "<form method='POST' action='/run_local_ap'><input type='submit' class='localap-btn' value='Run Locally on Access Point'></form>";
-  html += "</body></html>";
+  html += "'></div>"
+          "<div class='note'>⚠️ Device will automatically reboot and connect to the specified network after saving. The device IP may change.</div>"
+          "<input type='submit' value='Save WiFi Settings & Connect'>"
+          "</form>"
+          "<div class='divider'><span>OR</span></div>"
+          "<form method='POST' action='/run_local_ap'>"
+          "<input type='submit' class='localap-btn' value='🏠 Run Locally (Access Point Mode)'>"
+          "</form>"
+          "<div class='note'>💡 Local mode allows you to use the monitoring system without internet connectivity. Connect to this device's WiFi network and access the dashboard directly.</div>"
+          "</div></body></html>";
   return html;
 }
 
@@ -287,13 +320,51 @@ void startLocalAPMode() {
     Serial.print("Local AP Mode Started. Connect to AP 'AssetMonitor_Config', IP: ");
     Serial.println(WiFi.softAPIP());
 
-    // Serve the dashboard page on "/"
-    server.on("/", HTTP_GET, [](){
-        server.send(200, "text/html", htmlDashboard());
+    // Set up all the necessary routes for full functionality in AP mode
+    server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
+    server.on("/dashboard", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
+    server.on("/config", HTTP_GET, []() { server.send(200, "text/html", htmlConfig()); });
+    server.on("/events", HTTP_GET, sendHtmlEventsPage);
+    server.on("/asset", HTTP_GET, []() {
+        if (server.hasArg("idx")) {
+            uint8_t idx = server.arg("idx").toInt();
+            if (idx < config.assetCount && idx < MAX_ASSETS) { 
+                server.send(200, "text/html", htmlAssetDetail(idx)); 
+                return; 
+            }
+        }
+        server.send(404, "text/plain", "Asset not found");
     });
-
+    server.on("/shiftlogs_page", HTTP_GET, handleShiftLogsPage);
+    server.on("/download_shiftlog", HTTP_GET, handleDownloadShiftLog);
+    server.on("/analytics", HTTP_GET, []() { server.send(200, "text/html", htmlAnalytics()); });
+    server.on("/analytics-compare", HTTP_GET, []() { server.send(200, "text/html", htmlAnalyticsCompare()); });
+    server.on("/reconfigure_wifi", HTTP_POST, handleWiFiReconfigurePost);
+    server.on("/save_config", HTTP_POST, handleConfigPost);
+    server.on("/clear_log", HTTP_POST, handleClearLog);
+    server.on("/export_log", HTTP_GET, handleExportLog);
+    server.on("/api/summary", HTTP_GET, handleApiSummary);
+    server.on("/api/events", HTTP_GET, handleApiEvents);
+    server.on("/api/config", HTTP_GET, handleApiConfig);
+    server.on("/api/note", HTTP_POST, handleApiNote);
+    server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
+    server.on("/manual_time_set_page", HTTP_GET, []() { server.send(200, "text/html", getManualTimeSetHTML()); });
+    server.on("/manual_time_set", HTTP_POST, handleManualTimeSet);
+    
+    server.onNotFound(handleNotFound);
     server.begin();
-    while (true) { server.handleClient(); delay(10); }
+    while (true) { 
+        server.handleClient(); 
+        
+        // --- OLED update in AP mode (ADDITION) ---
+        unsigned long currentTime = millis();
+        if (currentTime - lastOledUpdate > 2000) { // Update every 2 seconds
+            updateOledDisplay();
+            lastOledUpdate = currentTime;
+        }
+        
+        delay(10); 
+    }
 }
 
 // --- Add the handler function ---
@@ -878,9 +949,6 @@ void setup() {
   // --- OLED update after WiFi connected (ADDITION) ---
   updateOledDisplay();
 
-  setupTime();
-  Serial.println("WiFi and Time setup complete.");
-
   Serial.printf("Initializing %u assets...\n", config.assetCount);
   time_t initialTime = time(nullptr);
   for (uint8_t i = 0; i < config.assetCount; ++i) {
@@ -956,7 +1024,60 @@ void setup() {
         return;
     }
 
-    // Normal WiFi connection logic...
+    // Normal WiFi connection logic
+    Serial.println("Attempting to connect to WiFi...");
+    WiFi.mode(WIFI_STA);
+    strncpy(wifi_ssid, ssid.c_str(), 32);
+    wifi_ssid[32] = '\0';
+    strncpy(wifi_pass, pass.c_str(), 64);
+    wifi_pass[64] = '\0';
+    
+    WiFi.begin(wifi_ssid, wifi_pass);
+    
+    int attempt = 0;
+    while (WiFi.status() != WL_CONNECTED && attempt < 20) { // Try for 10 seconds
+        delay(500);
+        Serial.print(".");
+        attempt++;
+        
+        // --- OLED update during WiFi connection attempt (ADDITION) ---
+        if (attempt % 4 == 0) { // Update every 2 seconds
+            display.clearDisplay();
+            display.setTextSize(1);
+            display.setTextColor(SSD1306_WHITE);
+            display.setCursor(0, 0);
+            display.print("Connecting WiFi...");
+            display.println();
+            display.print("SSID: ");
+            display.println(wifi_ssid);
+            display.print("Attempt: ");
+            display.print(attempt/4);
+            display.display();
+        }
+    }
+    
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("\nWiFi connection failed. Starting config portal...");
+        
+        // Clear saved credentials since they don't work
+        prefs.begin("assetmon", false);
+        prefs.remove("ssid");
+        prefs.remove("pass");
+        prefs.end();
+        
+        startConfigPortal();
+        return;
+    }
+    
+    Serial.println("");
+    Serial.print("WiFi connected successfully! IP address: ");
+    Serial.println(WiFi.localIP());
+    
+    // --- OLED update after WiFi connected (ADDITION) ---
+    updateOledDisplay();
+
+    setupTime();
+    Serial.println("WiFi and Time setup complete.");
 
 
 
@@ -3296,8 +3417,8 @@ bool checkInternetConnectivity() {
 String getLocalResources() {
   String resources = "<style>";
   
-  // Bootstrap 5.3.0 minimal CSS (core components only)
-  resources += ":root{--bs-blue:#0d6efd;--bs-indigo:#6610f2;--bs-purple:#6f42c1;--bs-pink:#d63384;--bs-red:#dc3545;--bs-orange:#fd7e14;--bs-yellow:#ffc107;--bs-green:#198754;--bs-teal:#20c997;--bs-cyan:#0dcaf0;--bs-white:#fff;--bs-gray:#6c757d;--bs-gray-dark:#343a40;--bs-primary:#0d6efd;--bs-secondary:#6c757d;--bs-success:#198754;--bs-info:#0dcaf0;--bs-warning:#ffc107;--bs-danger:#dc3545;--bs-light:#f8f9fa;--bs-dark:#212529;--bs-font-family-sans-serif:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji';--bs-body-font-family:var(--bs-font-family-sans-serif)}";
+  // Bootstrap 5.3.0 minimal CSS (core components only) with missing CSS variables
+  resources += ":root{--bs-blue:#0d6efd;--bs-indigo:#6610f2;--bs-purple:#6f42c1;--bs-pink:#d63384;--bs-red:#dc3545;--bs-orange:#fd7e14;--bs-yellow:#ffc107;--bs-green:#198754;--bs-teal:#20c997;--bs-cyan:#0dcaf0;--bs-white:#fff;--bs-gray:#6c757d;--bs-gray-dark:#343a40;--bs-primary:#0d6efd;--bs-secondary:#6c757d;--bs-success:#198754;--bs-info:#0dcaf0;--bs-warning:#ffc107;--bs-danger:#dc3545;--bs-light:#f8f9fa;--bs-dark:#212529;--bs-font-family-sans-serif:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji';--bs-body-font-family:var(--bs-font-family-sans-serif);--bs-primary-rgb:13,110,253;--bs-secondary-rgb:108,117,125;--bs-success-rgb:25,135,84;--bs-info-rgb:13,202,240;--bs-warning-rgb:255,193,7;--bs-danger-rgb:220,53,69;--bs-light-rgb:248,249,250;--bs-dark-rgb:33,37,41}";
   resources += "*,::after,::before{box-sizing:border-box}body{margin:0;font-family:var(--bs-body-font-family);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff}";
   resources += ".container,.container-fluid{width:100%;padding-right:var(--bs-gutter-x,.75rem);padding-left:var(--bs-gutter-x,.75rem);margin-right:auto;margin-left:auto}";
   resources += ".row{--bs-gutter-x:1.5rem;--bs-gutter-y:0;display:flex;flex-wrap:wrap;margin-top:calc(var(--bs-gutter-y)*-1);margin-right:calc(var(--bs-gutter-x)*-.5);margin-left:calc(var(--bs-gutter-x)*-.5)}";
@@ -3311,13 +3432,24 @@ String getLocalResources() {
   resources += ".btn-danger{color:#fff;background-color:#dc3545;border-color:#dc3545}.btn-danger:hover{color:#fff;background-color:#bb2d3b;border-color:#b02a37}";
   resources += ".btn-warning{color:#000;background-color:#ffc107;border-color:#ffc107}.btn-warning:hover{color:#000;background-color:#ffca2c;border-color:#ffc720}";
   resources += ".btn-info{color:#000;background-color:#0dcaf0;border-color:#0dcaf0}.btn-info:hover{color:#000;background-color:#31d2f2;border-color:#25cff2}";
+  resources += ".btn-outline-secondary{color:#6c757d;border-color:#6c757d}.btn-outline-secondary:hover{color:#fff;background-color:#6c757d;border-color:#6c757d}";
   resources += ".navbar{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;padding-top:.5rem;padding-bottom:.5rem}";
+  resources += ".navbar-expand-lg{flex-wrap:nowrap;justify-content:flex-start}.navbar-expand-lg .navbar-nav{flex-direction:row}.navbar-expand-lg .navbar-nav .nav-link{padding-right:.5rem;padding-left:.5rem}";
   resources += ".navbar-dark{--bs-navbar-color:rgba(255,255,255,.55);--bs-navbar-hover-color:rgba(255,255,255,.75);--bs-navbar-disabled-color:rgba(255,255,255,.25);--bs-navbar-active-color:#fff;--bs-navbar-brand-color:#fff;--bs-navbar-brand-hover-color:#fff}";
+  resources += ".navbar-brand{padding-top:.3125rem;padding-bottom:.3125rem;margin-right:1rem;font-size:1.25rem;text-decoration:none;white-space:nowrap}";
+  resources += ".navbar-nav{display:flex;flex-direction:column;padding-left:0;margin-bottom:0;list-style:none}.navbar-nav .nav-link{padding-right:0;padding-left:0}.navbar-nav .nav-item{margin-right:0}";
+  resources += ".nav-link{display:block;padding:.5rem 1rem;color:var(--bs-navbar-color);text-decoration:none;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out}";
+  resources += ".nav-link:hover{color:var(--bs-navbar-hover-color)}";
+  resources += ".ms-auto{margin-left:auto!important}";
   resources += ".bg-dark{--bs-bg-opacity:1;background-color:rgba(var(--bs-dark-rgb),var(--bs-bg-opacity))!important}";
+  resources += ".shadow-sm{box-shadow:0 .125rem .25rem rgba(0,0,0,.075)!important}";
   resources += ".table{--bs-table-bg:transparent;--bs-table-accent-bg:transparent;--bs-table-striped-color:#212529;--bs-table-striped-bg:rgba(0,0,0,.05);--bs-table-active-color:#212529;--bs-table-active-bg:rgba(0,0,0,.1);--bs-table-hover-color:#212529;--bs-table-hover-bg:rgba(0,0,0,.075);width:100%;margin-bottom:1rem;color:#212529;vertical-align:top;border-color:#dee2e6}";
   resources += ".table>:not(caption)>*>*{padding:.5rem .5rem;background-color:var(--bs-table-bg);border-bottom-width:1px;box-shadow:inset 0 0 0 9999px var(--bs-table-accent-bg)}";
   resources += ".table-striped>tbody>tr:nth-of-type(odd)>td,.table-striped>tbody>tr:nth-of-type(odd)>th{--bs-table-accent-bg:var(--bs-table-striped-bg);color:var(--bs-table-striped-color)}";
   resources += ".table-hover>tbody>tr:hover>td,.table-hover>tbody>tr:hover>th{--bs-table-accent-bg:var(--bs-table-hover-bg);color:var(--bs-table-hover-color)}";
+  resources += ".table-responsive{overflow-x:auto;-webkit-overflow-scrolling:touch}";
+  resources += ".table-sm>:not(caption)>*>*{padding:.25rem .25rem}";
+  resources += ".align-middle{vertical-align:middle!important}";
   resources += ".badge{display:inline-block;padding:.35em .65em;font-size:.75em;font-weight:700;line-height:1;color:#fff;text-align:center;white-space:nowrap;vertical-align:baseline;border-radius:.375rem}";
   resources += ".bg-success{--bs-bg-opacity:1;background-color:rgba(var(--bs-success-rgb),var(--bs-bg-opacity))!important}";
   resources += ".bg-danger{--bs-bg-opacity:1;background-color:rgba(var(--bs-danger-rgb),var(--bs-bg-opacity))!important}";
@@ -3326,27 +3458,37 @@ String getLocalResources() {
   resources += ".bg-primary{--bs-bg-opacity:1;background-color:rgba(var(--bs-primary-rgb),var(--bs-bg-opacity))!important}";
   resources += ".text-muted{--bs-text-opacity:1;color:#6c757d!important}";
   resources += ".text-center{text-align:center!important}";
-  resources += ".mt-3{margin-top:1rem!important}.mt-4{margin-top:1.5rem!important}.mb-3{margin-bottom:1rem!important}";
-  resources += ".d-flex{display:flex!important}.justify-content-between{justify-content:space-between!important}.align-items-center{align-items:center!important}";
+  resources += ".text-white{--bs-text-opacity:1;color:#fff!important}";
+  resources += ".text-dark{--bs-text-opacity:1;color:#212529!important}";
+  resources += ".mt-3{margin-top:1rem!important}.mt-4{margin-top:1.5rem!important}.mb-3{margin-bottom:1rem!important}.mb-4{margin-bottom:1.5rem!important}";
+  resources += ".d-flex{display:flex!important}.d-grid{display:grid!important}.d-block{display:block!important}";
+  resources += ".justify-content-between{justify-content:space-between!important}.align-items-center{align-items:center!important}";
+  resources += ".w-100{width:100%!important}";
+  resources += ".gap-2{gap:.5rem!important}";
   resources += ".form-label{margin-bottom:.5rem}.form-control{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;background-image:none;border:1px solid #ced4da;appearance:none;border-radius:.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}";
   resources += ".form-select{display:block;width:100%;padding:.375rem 2.25rem .375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;border:1px solid #ced4da;border-radius:.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out;appearance:none}";
   resources += ".modal{position:fixed;top:0;left:0;z-index:1055;display:none;width:100%;height:100%;overflow-x:hidden;overflow-y:auto;outline:0}";
+  resources += ".modal.show{display:block}";
   resources += ".modal-dialog{position:relative;width:auto;margin:.5rem;pointer-events:none}";
   resources += ".modal-content{position:relative;display:flex;flex-direction:column;width:100%;pointer-events:auto;background-color:#fff;background-clip:padding-box;border:1px solid rgba(0,0,0,.2);border-radius:.3rem;outline:0}";
   resources += ".modal-header{display:flex;flex-shrink:0;align-items:center;justify-content:space-between;padding:1rem 1rem;border-bottom:1px solid #dee2e6;border-top-left-radius:calc(.3rem - 1px);border-top-right-radius:calc(.3rem - 1px)}";
   resources += ".modal-body{position:relative;flex:1 1 auto;padding:1rem}";
   resources += ".modal-footer{display:flex;flex-wrap:wrap;flex-shrink:0;align-items:center;justify-content:flex-end;padding:.75rem;border-top:1px solid #dee2e6;border-bottom-right-radius:calc(.3rem - 1px);border-bottom-left-radius:calc(.3rem - 1px)}";
+  resources += ".btn-close{box-sizing:content-box;width:1em;height:1em;padding:.25em .25em;color:#000;background:transparent url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27%23000%27%3e%3cpath d=%27M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z%27/%3e%3c/svg%3e') center/1em auto no-repeat;border:0;border-radius:.375rem;opacity:.5}";
+  resources += ".btn-close:hover{color:#000;text-decoration:none;opacity:.75}";
   
   // Roboto font fallback
   resources += "body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}";
   
   resources += "</style>";
   
-  // Basic Bootstrap JavaScript functionality (minimal modal support)
+  // Enhanced Bootstrap JavaScript functionality (modal support and navbar toggle)
   resources += "<script>";
   resources += "class Modal{constructor(e){this.element=e,this.isShown=!1}show(){this.isShown||(this.element.style.display='block',this.element.classList.add('show'),this.isShown=!0,document.body.style.overflow='hidden')}hide(){this.isShown&&(this.element.style.display='none',this.element.classList.remove('show'),this.isShown=!1,document.body.style.overflow='')}static getInstance(e){return e._modalInstance||(e._modalInstance=new Modal(e)),e._modalInstance}}";
   resources += "window.bootstrap={Modal:Modal};";
   resources += "document.addEventListener('click',function(e){if(e.target.matches('[data-bs-dismiss=\"modal\"]')){const modal=e.target.closest('.modal');if(modal){const instance=Modal.getInstance(modal);instance.hide()}}});";
+  // Add basic navbar toggle functionality
+  resources += "document.addEventListener('click',function(e){if(e.target.matches('[data-bs-toggle=\"collapse\"]')){const target=document.querySelector(e.target.getAttribute('data-bs-target'));if(target){target.classList.toggle('show')}}});";
   resources += "</script>";
   
   return resources;
