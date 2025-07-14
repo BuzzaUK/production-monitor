@@ -19,11 +19,29 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // --- OLED Display State (ADDITION) ---
 String lastSsidDisplayed = "";
 String lastIpDisplayed = "";
+unsigned long lastOledUpdate = 0;
 
 // --- Function to update OLED with Network info (ADDITION) ---
 void updateOledDisplay() {
-  String ssid = WiFi.SSID();
-  String ip = WiFi.isConnected() ? WiFi.localIP().toString() : "No IP";
+  String ssid = "";
+  String ip = "";
+  
+  // Check if device is in AP mode or connected to WiFi
+  if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+    // In AP mode - show local AP information
+    ssid = "AP: AssetMonitor_Config";
+    ip = WiFi.softAPIP().toString();
+  } else if (WiFi.isConnected()) {
+    // Connected to WiFi - show network information
+    ssid = WiFi.SSID();
+    ip = WiFi.localIP().toString();
+  } else {
+    // Not connected
+    ssid = "Not Connected";
+    ip = "No IP";
+  }
+  
+  // Only update display if information has changed
   if (ssid != lastSsidDisplayed || ip != lastIpDisplayed) {
     display.clearDisplay();
     display.setTextSize(1);
@@ -295,12 +313,28 @@ void startConfigPortal() {
   WiFi.softAP("AssetMonitor_Config", "setpassword");
   Serial.print("Config Portal Started. Connect to AP 'AssetMonitor_Config', IP: ");
   Serial.println(WiFi.softAPIP());
+  
+  // Update OLED with AP info
+  updateOledDisplay();
+  
   server.on("/", HTTP_GET, [](){ server.send(200, "text/html", wifiConfigHTML()); });
   server.on("/wifi_save_config", HTTP_POST, handleWifiConfigPost);
   server.on("/run_local_ap", HTTP_POST, handleRunLocalAP); // Handler for the button
   server.onNotFound([](){ server.send(200, "text/html", wifiConfigHTML()); });
   server.begin();
-  while (true) { server.handleClient(); delay(10); }
+  
+  while (true) { 
+    server.handleClient(); 
+    
+    // Update OLED periodically in config portal mode
+    unsigned long currentTime = millis();
+    if (currentTime - lastOledUpdate > 2000) { // Update every 2 seconds
+        updateOledDisplay();
+        lastOledUpdate = currentTime;
+    }
+    
+    delay(10); 
+  }
 }
 
 // Example main app page handler
@@ -319,6 +353,9 @@ void startLocalAPMode() {
     WiFi.softAP("AssetMonitor_Config", "setpassword");
     Serial.print("Local AP Mode Started. Connect to AP 'AssetMonitor_Config', IP: ");
     Serial.println(WiFi.softAPIP());
+
+    // Update OLED with AP info immediately
+    updateOledDisplay();
 
     // Set up all the necessary routes for full functionality in AP mode
     server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
@@ -1118,14 +1155,18 @@ void setup() {
 // --- Block 1:  loop() function 
 // =========================================================================
 
-// --- OLED update timing variable (ADDITION) ---
-unsigned long lastOledUpdate = 0;
-
 void loop() {
   server.handleClient();
 
   // Periodic connectivity checking
   checkInternetConnectivity();
+  
+  // Periodic OLED updates for normal operation mode
+  unsigned long currentTime = millis();
+  if (currentTime - lastOledUpdate > 5000) { // Update every 5 seconds in normal mode
+      updateOledDisplay();
+      lastOledUpdate = currentTime;
+  }
 
   if (config.enableShiftArchiving && g_shiftFeatureInitialized) {
     processShiftLogic();
@@ -1244,12 +1285,6 @@ void loop() {
       logSystemEvent(true, now_ts, "All Assets Recovered");
       Serial.printf("Serial Mode: System -> UP. Down Duration: %lu s\n", systemDownDuration);
     }
-  }
-
-  // --- OLED: update every 5 seconds (ADDITION) ---
-  if (millis() - lastOledUpdate > 5000) {
-    updateOledDisplay();
-    lastOledUpdate = millis();
   }
 
   delay(200);
