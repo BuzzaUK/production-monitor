@@ -143,6 +143,8 @@ String formatMMSS(unsigned long seconds);
 void loadConfig();
 void saveConfig();
 void setupWiFiSmart();
+void handleRunLocalAP();
+void startLocalAPMode();
 
 
 // --- Global Constants ---
@@ -209,6 +211,11 @@ String wifiConfigHTML() {
                 "input[type=text], input[type=password] { width:100%; padding:0.5em; box-sizing: border-box; }"
                 "input[type=submit] { background: #0366d6; color: #fff; border: none; padding: 0.7em 1.5em; margin-top:1em; border-radius: 4px; cursor:pointer;}"
                 "input[type=submit]:hover { background: #0356b6; }"
+                ".localap-btn { background: #28a745; color: #fff; border: none; padding: 0.7em 1.5em; margin-top:1em; border-radius: 4px; cursor:pointer; width:100%; }"
+                ".localap-btn:hover { background: #218838; }"
+                ".divider { text-align: center; margin: 2em 0; position: relative; }"
+                ".divider:before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ddd; }"
+                ".divider span { background: #f6f8fa; padding: 0 1em; color: #666; }"
                 ".note { color: #888; font-size: 0.95em; margin: 1em 0; }"
                 "</style>"
                 "</head><body>"
@@ -225,6 +232,11 @@ String wifiConfigHTML() {
           "<div class='note'>Enter your WiFi details above. Device will reboot after saving.</div>"
           "<input type='submit' value='Save & Reboot'>"
           "</form>"
+          "<div class='divider'><span>OR</span></div>"
+          "<form method='POST' action='/run_local_ap'>"
+          "<input type='submit' class='localap-btn' value='🏠 Run Locally (Access Point Mode)'>"
+          "</form>"
+          "<div class='note'>💡 Local mode allows you to use the monitoring system without internet connectivity. Connect to this device's WiFi network and access the dashboard directly.</div>"
           "</body></html>";
   return html;
 }
@@ -260,14 +272,99 @@ void startConfigPortal() {
   Serial.println(WiFi.softAPIP());
   server.on("/", HTTP_GET, [](){ server.send(200, "text/html", wifiConfigHTML()); });
   server.on("/wifi_save_config", HTTP_POST, handleWifiConfigPost);
+  server.on("/run_local_ap", HTTP_POST, handleRunLocalAP);
   // Add a catch-all for other paths in AP mode to redirect to config
   server.onNotFound([](){ server.send(200, "text/html", wifiConfigHTML()); }); 
   server.begin();
   while (true) { server.handleClient(); delay(10); } // Loop indefinitely serving the config page
 }
 
+void handleRunLocalAP() {
+    Preferences prefs;
+    prefs.begin("assetmon", false);
+    prefs.putBool("run_local_ap", true);
+    prefs.end();
+    String html = "<html><head><meta http-equiv='refresh' content='2;url=/'></head><body>";
+    html += "<h2>Device will reboot and run locally as an Access Point.<br>";
+    html += "You will be redirected to the dashboard.</h2></body></html>";
+    server.send(200, "text/html", html);
+    delay(1200);
+    ESP.restart();
+}
+
+void startLocalAPMode() {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP("AssetMonitor_Config", "setpassword");
+    Serial.print("Local AP Mode Started. Connect to AP 'AssetMonitor_Config', IP: ");
+    Serial.println(WiFi.softAPIP());
+    
+    // Local OLED update timing variable for AP mode
+    unsigned long localOledUpdate = 0;
+    
+    // Set up all the necessary routes for full functionality in AP mode
+    server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
+    server.on("/dashboard", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
+    server.on("/config", HTTP_GET, []() { server.send(200, "text/html", htmlConfig()); });
+    server.on("/events", HTTP_GET, sendHtmlEventsPage);
+    server.on("/asset", HTTP_GET, []() {
+        if (server.hasArg("idx")) {
+            uint8_t idx = server.arg("idx").toInt();
+            if (idx < config.assetCount && idx < MAX_ASSETS) { 
+                server.send(200, "text/html", htmlAssetDetail(idx)); 
+                return; 
+            }
+        }
+        server.send(404, "text/plain", "Asset not found");
+    });
+    server.on("/shiftlogs_page", HTTP_GET, handleShiftLogsPage);
+    server.on("/download_shiftlog", HTTP_GET, handleDownloadShiftLog);
+    server.on("/analytics", HTTP_GET, []() { server.send(200, "text/html", htmlAnalytics()); });
+    server.on("/analytics-compare", HTTP_GET, []() { server.send(200, "text/html", htmlAnalyticsCompare()); });
+    server.on("/reconfigure_wifi", HTTP_POST, handleWiFiReconfigurePost);
+    server.on("/save_config", HTTP_POST, handleConfigPost);
+    server.on("/clear_log", HTTP_POST, handleClearLog);
+    server.on("/export_log", HTTP_GET, handleExportLog);
+    server.on("/api/summary", HTTP_GET, handleApiSummary);
+    server.on("/api/events", HTTP_GET, handleApiEvents);
+    server.on("/api/config", HTTP_GET, handleApiConfig);
+    server.on("/api/note", HTTP_POST, handleApiNote);
+    server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
+    
+    server.onNotFound(handleNotFound);
+    server.begin();
+    while (true) { 
+        server.handleClient(); 
+        
+        // --- OLED update in AP mode ---
+        unsigned long currentTime = millis();
+        if (currentTime - localOledUpdate > 2000) { // Update every 2 seconds
+            updateOledDisplay();
+            localOledUpdate = currentTime;
+        }
+        
+        delay(10); 
+    }
+}
+
 // This new function replaces your old setupWiFiSmart(), startConfigPortal(), etc.
 void setupWiFiSmart() {
+  // Check for run_local_ap preference first
+  Preferences prefs;
+  prefs.begin("assetmon", true);
+  bool runLocalAP = prefs.getBool("run_local_ap", false);
+  String ssid = prefs.getString("ssid", "");
+  String pass = prefs.getString("pass", "");
+  prefs.end();
+
+  if (runLocalAP) {
+    prefs.begin("assetmon", false);
+    prefs.putBool("run_local_ap", false);
+    prefs.end();
+    startLocalAPMode();
+    return;
+  }
+
   // WiFiManager is a non-blocking alternative to the while loop in startConfigPortal()
   // but for setup, a simple blocking call is fine.
   WiFiManager wm;
