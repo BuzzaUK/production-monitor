@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>AssetMonitorLocalAP - Test Simulation</title>
+    <meta name='viewport' content='width=device-width,initial-scale=1'>
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
+    <style>
+        .demo-container { max-width: 800px; margin: 20px auto; }
+        .screenshot { border: 2px solid #ddd; border-radius: 8px; margin: 20px 0; }
+        .feature-list { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container demo-container">
+        <h1 class="text-center mb-4">AssetMonitorLocalAP.ino - Feature Demonstration</h1>
+        
+        <div class="alert alert-success">
+            <h4>✅ Implementation Complete!</h4>
+            <p>The unified ESP32 sketch has been successfully created with all required features merged from the repository branches.</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <h3>🔧 Key Features Implemented</h3>
+                <div class="feature-list">
+                    <ul class="list-unstyled">
+                        <li>✅ <strong>Custom WiFi Configuration</strong> - No more WiFiManager dependency</li>
+                        <li>✅ <strong>"Run Locally" Button</strong> - Switch to AP mode without WiFi</li>
+                        <li>✅ <strong>Improved Styling</strong> - Modern Bootstrap UI with gradients</li>
+                        <li>✅ <strong>OLED Display</strong> - Shows IP, SSID, and startup status</li>
+                        <li>✅ <strong>No Password AP</strong> - AssetMonitor_Config open access</li>
+                        <li>✅ <strong>Local Logging</strong> - CSV download functionality</li>
+                        <li>✅ <strong>All Pages Work in AP</strong> - Dashboard, Config, Events</li>
+                        <li>✅ <strong>Smart Startup</strong> - Try WiFi first, fallback to AP</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <h3>📱 WiFi Configuration Page</h3>
+                <div class="card">
+                    <div class="card-body" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 30px;">
+                        <h5>Production Monitor</h5>
+                        <p>Asset Monitoring System Configuration</p>
+                        <div style="background: white; padding: 20px; border-radius: 8px; color: #333; margin: 20px 0;">
+                            <h6>WiFi Network Setup</h6>
+                            <input type="text" class="form-control mb-2" placeholder="Enter WiFi network name" disabled>
+                            <input type="password" class="form-control mb-2" placeholder="Enter WiFi password" disabled>
+                            <button class="btn btn-primary w-100 mb-2" disabled>Save WiFi Settings & Connect</button>
+                            <hr>
+                            <button class="btn btn-warning w-100" disabled>🏠 Run Locally (Access Point Mode)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>📊 Dashboard in AP Mode</h3>
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">Asset Monitor Dashboard</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <strong>Network Status:</strong> Running in Local AP Mode (IP: 192.168.4.1)
+                        </div>
+                        
+                        <h5>Asset Overview</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <h6>Line 1</h6>
+                                        <p class="text-success"><strong>Running</strong></p>
+                                        <small>Pin: 4</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-danger">
+                                    <div class="card-body text-center">
+                                        <h6>Line 2</h6>
+                                        <p class="text-danger"><strong>Stopped</strong></p>
+                                        <small>Pin: 12</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>🖥️ OLED Display States</h3>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card bg-dark text-white">
+                            <div class="card-header text-center">Startup</div>
+                            <div class="card-body" style="font-family: monospace; font-size: 12px;">
+                                Production Monitor<br>
+                                Starting...<br>
+                                <br>
+                                Checking WiFi prefs...
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-dark text-white">
+                            <div class="card-header text-center">WiFi Connection</div>
+                            <div class="card-body" style="font-family: monospace; font-size: 12px;">
+                                Connecting WiFi...<br>
+                                <br>
+                                SSID: MyNetwork<br>
+                                Attempt: 3
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-dark text-white">
+                            <div class="card-header text-center">AP Mode</div>
+                            <div class="card-body" style="font-family: monospace; font-size: 12px;">
+                                Network: AssetMonitor_Config<br>
+                                <br>
+                                IP: 192.168.4.1
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>🔄 Startup Flow</h3>
+                <div class="card">
+                    <div class="card-body">
+                        <ol>
+                            <li><strong>Boot:</strong> OLED shows "Starting..."</li>
+                            <li><strong>Check Preferences:</strong> Look for stored WiFi credentials</li>
+                            <li><strong>Check Run Local Flag:</strong> If "Run Locally" was pressed, go to AP mode</li>
+                            <li><strong>Try WiFi:</strong> If credentials exist, attempt connection with OLED feedback</li>
+                            <li><strong>Fallback to AP:</strong> If WiFi fails, start AP mode (no password)</li>
+                            <li><strong>Start Web Server:</strong> All pages available in both modes</li>
+                            <li><strong>Continuous Operation:</strong> OLED shows current network status</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>📋 Implementation Summary</h3>
+                <div class="alert alert-info">
+                    <h5>File: AssetMonitorLocalAP.ino (1,264 lines)</h5>
+                    <p><strong>Requirements Met:</strong></p>
+                    <ul>
+                        <li>✅ Removed WiFiManager and implemented custom WiFi logic</li>
+                        <li>✅ Added "Run Locally" button with improved styling</li>
+                        <li>✅ All local AP pages use new Bootstrap styling with modern design</li>
+                        <li>✅ OLED displays device IP and SSID continuously with startup info</li>
+                        <li>✅ Local logging with CSV download functionality preserved</li>
+                        <li>✅ All functionality available in AP mode</li>
+                        <li>✅ Startup attempts stored WiFi first, then enables AP mode</li>
+                        <li>✅ No password required for local AP access</li>
+                        <li>✅ Targets ESP32 hardware with proper includes</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="alert alert-warning">
+                    <h5>⚠️ Usage Instructions</h5>
+                    <ol>
+                        <li>Upload <code>AssetMonitorLocalAP.ino</code> to your ESP32</li>
+                        <li>On first boot, device will start in AP mode (no stored WiFi)</li>
+                        <li>Connect to "AssetMonitor_Config" WiFi network (no password)</li>
+                        <li>Navigate to 192.168.4.1 in your browser</li>
+                        <li>Either configure WiFi or click "Run Locally" for permanent AP mode</li>
+                        <li>Access Dashboard, Events, and Config pages normally</li>
+                        <li>Download log files via the Events page</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>
+</body>
+</html>
