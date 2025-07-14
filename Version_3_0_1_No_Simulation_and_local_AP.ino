@@ -299,6 +299,9 @@ void startLocalAPMode() {
     Serial.print("Local AP Mode Started. Connect to AP 'AssetMonitor_Config', IP: ");
     Serial.println(WiFi.softAPIP());
     
+    // Local OLED update timing variable for AP mode
+    unsigned long localOledUpdate = 0;
+    
     // Set up all the necessary routes for full functionality in AP mode
     server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
     server.on("/dashboard", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
@@ -332,6 +335,14 @@ void startLocalAPMode() {
     server.begin();
     while (true) { 
         server.handleClient(); 
+        
+        // --- OLED update in AP mode ---
+        unsigned long currentTime = millis();
+        if (currentTime - localOledUpdate > 2000) { // Update every 2 seconds
+            updateOledDisplay();
+            localOledUpdate = currentTime;
+        }
+        
         delay(10); 
     }
 }
