@@ -1,3 +1,17 @@
+/*
+ * Asset Monitor Local V2 - Production Monitor System
+ * 
+ * CHANGES MADE IN THIS PATCH:
+ * - Removed duplicate function definitions that were causing compilation issues:
+ *   * urlEncode() - Removed second implementation, kept version with better error handling
+ *   * urlDecode() - Removed second implementation, kept version with better error handling  
+ *   * formatMMSS() - Removed second implementation, kept version with better formatting
+ *   * eventToCSV() - Removed second implementation, kept version with proper variable naming
+ * - Cleaned up redundant code blocks totaling ~50 lines
+ * - Preserved all core functionality: WiFi, shift logic, asset monitoring, web server, logging, API endpoints
+ * - File structure and logic flow maintained for compilation correctness
+ */
+
 #include <WiFi.h>
 #include <WebServer.h>
 #include <SPIFFS.h>
@@ -3353,56 +3367,6 @@ void handleNotFound() {
   }
 }
 
-// URL encoding/decoding functions (from original)
-String urlEncode(const String& str) {
-  String encoded = "";
-  for (size_t i = 0; i < str.length(); i++) {
-    char c = str.charAt(i);
-    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-      encoded += c;
-    } else {
-      encoded += '%';
-      if (c < 16) encoded += '0';
-      encoded += String(c, HEX);
-    }
-  }
-  return encoded;
-}
 
-String urlDecode(const String& str) {
-  String decoded = "";
-  for (size_t i = 0; i < str.length(); i++) {
-    if (str.charAt(i) == '%' && i + 2 < str.length()) {
-      char hex[3] = {str.charAt(i+1), str.charAt(i+2), '\0'};
-      decoded += (char)strtol(hex, NULL, 16);
-      i += 2;
-    } else if (str.charAt(i) == '+') {
-      decoded += ' ';
-    } else {
-      decoded += str.charAt(i);
-    }
-  }
-  return decoded;
-}
 
-String formatMMSS(unsigned long seconds) {
-  unsigned long minutes = seconds / 60;
-  seconds = seconds % 60;
-  return String(minutes) + ":" + (seconds < 10 ? "0" : "") + String(seconds);
-}
 
-String eventToCSV(const Event& e) {
-  struct tm* ti = localtime(&e.timestamp);
-  char datebuf[11], timebuf[9];
-  strftime(datebuf, sizeof(datebuf), "%d/%m/%Y", ti);
-  strftime(timebuf, sizeof(timebuf), "%H:%M:%S", ti);
-  
-  String csv = String(datebuf) + "," + String(timebuf) + "," + 
-               String(e.assetName) + "," + String(e.eventType) + "," + 
-               String(e.state) + "," + String(e.availability, 2) + "," + 
-               String(e.runtime, 2) + "," + String(e.downtime, 2) + "," + 
-               String(e.mtbf, 2) + "," + String(e.mttr, 2) + "," + 
-               String(e.stops) + "," + String(e.runDuration) + "," + 
-               String(e.stopDuration) + "," + String(e.note);
-  return csv;
-}
