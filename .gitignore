@@ -1,0 +1,27 @@
+# Arduino IDE build files
+build/
+*.elf
+*.hex
+*.bin
+*.map
+
+# Temporary files
+*~
+*.tmp
+*.bak
+.DS_Store
+
+# Node modules (if any web development tools are used)
+node_modules/
+
+# VS Code files
+.vscode/
+
+# PlatformIO files
+.pio/
+.pioenvs/
+.piolibdeps/
+platformio.ini
+
+# Other common files
+*.log
