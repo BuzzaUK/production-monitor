@@ -247,6 +247,130 @@ AssetState assetStates[MAX_ASSETS];
 char wifi_ssid[33] = "";
 char wifi_pass[65] = "";
 
+// --- Local Assets for Offline Functionality ---
+// Minimal Bootstrap CSS (critical styles only)
+const char MINIMAL_BOOTSTRAP_CSS[] PROGMEM = R"(
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff}
+.container,.container-fluid{width:100%;padding-right:var(--bs-gutter-x,.75rem);padding-left:var(--bs-gutter-x,.75rem);margin-right:auto;margin-left:auto}
+@media (min-width:576px){.container{max-width:540px}}
+@media (min-width:768px){.container{max-width:720px}}
+@media (min-width:992px){.container{max-width:960px}}
+@media (min-width:1200px){.container{max-width:1140px}}
+.row{--bs-gutter-x:1.5rem;--bs-gutter-y:0;display:flex;flex-wrap:wrap;margin-top:calc(-1 * var(--bs-gutter-y));margin-right:calc(-.5 * var(--bs-gutter-x));margin-left:calc(-.5 * var(--bs-gutter-x))}
+.col,.col-auto,.col-1,.col-2,.col-3,.col-4,.col-5,.col-6,.col-7,.col-8,.col-9,.col-10,.col-11,.col-12,.col-md-1,.col-md-2,.col-md-3,.col-md-4,.col-md-5,.col-md-6,.col-md-7,.col-md-8,.col-md-9,.col-md-10,.col-md-11,.col-md-12{flex-shrink:0;width:100%;max-width:100%;padding-right:calc(var(--bs-gutter-x) * .5);padding-left:calc(var(--bs-gutter-x) * .5);margin-top:var(--bs-gutter-y)}
+.col-1{flex:0 0 auto;width:8.33333333%}.col-2{flex:0 0 auto;width:16.66666667%}.col-3{flex:0 0 auto;width:25%}.col-4{flex:0 0 auto;width:33.33333333%}.col-6{flex:0 0 auto;width:50%}.col-12{flex:0 0 auto;width:100%}
+@media (min-width:768px){.col-md-2{flex:0 0 auto;width:16.66666667%}.col-md-3{flex:0 0 auto;width:25%}.col-md-4{flex:0 0 auto;width:33.33333333%}.col-md-6{flex:0 0 auto;width:50%}.col-md-8{flex:0 0 auto;width:66.66666667%}}
+.table{--bs-table-color-type:initial;--bs-table-bg-type:initial;--bs-table-color-state:initial;--bs-table-bg-state:initial;--bs-table-color:#212529;--bs-table-bg:transparent;--bs-table-border-color:#dee2e6;--bs-table-accent-bg:transparent;--bs-table-striped-color:#212529;--bs-table-striped-bg:rgba(0,0,0,.05);--bs-table-active-color:#212529;--bs-table-active-bg:rgba(0,0,0,.1);--bs-table-hover-color:#212529;--bs-table-hover-bg:rgba(0,0,0,.075);width:100%;margin-bottom:1rem;color:var(--bs-table-color);vertical-align:top;border-color:var(--bs-table-border-color)}
+.table>:not(caption)>*>*{padding:.5rem .5rem;background-color:var(--bs-table-bg);border-bottom-width:1px;box-shadow:inset 0 0 0 9999px var(--bs-table-bg-state,var(--bs-table-bg-type,var(--bs-table-accent-bg)))}
+.table-striped>tbody>tr:nth-of-type(odd)>td,.table-striped>tbody>tr:nth-of-type(odd)>th{--bs-table-color-type:var(--bs-table-striped-color);--bs-table-bg-type:var(--bs-table-striped-bg)}
+.table-hover>tbody>tr:hover>td,.table-hover>tbody>tr:hover>th{--bs-table-color-type:var(--bs-table-hover-color);--bs-table-bg-type:var(--bs-table-hover-bg)}
+.table-sm>:not(caption)>*>*{padding:.25rem .25rem}
+.table-responsive{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.btn{--bs-btn-padding-x:0.75rem;--bs-btn-padding-y:0.375rem;--bs-btn-font-size:1rem;--bs-btn-font-weight:400;--bs-btn-line-height:1.5;--bs-btn-color:#212529;--bs-btn-bg:transparent;--bs-btn-border-width:1px;--bs-btn-border-color:transparent;--bs-btn-border-radius:0.375rem;--bs-btn-hover-border-color:transparent;--bs-btn-box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 1px 1px rgba(0,0,0,.075);--bs-btn-disabled-opacity:0.65;--bs-btn-focus-box-shadow:0 0 0 0.25rem rgba(var(--bs-btn-focus-shadow-rgb),.5);display:inline-block;padding:var(--bs-btn-padding-y) var(--bs-btn-padding-x);margin-bottom:0;font-size:var(--bs-btn-font-size);font-weight:var(--bs-btn-font-weight);line-height:var(--bs-btn-line-height);color:var(--bs-btn-color);text-align:center;text-decoration:none;vertical-align:middle;cursor:pointer;-webkit-user-select:none;-moz-user-select:none;user-select:none;border:var(--bs-btn-border-width) solid var(--bs-btn-border-color);border-radius:var(--bs-btn-border-radius);background-color:var(--bs-btn-bg);transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+.btn:hover{color:var(--bs-btn-hover-color);background-color:var(--bs-btn-hover-bg);border-color:var(--bs-btn-hover-border-color)}
+.btn-primary{--bs-btn-color:#fff;--bs-btn-bg:#0d6efd;--bs-btn-border-color:#0d6efd;--bs-btn-hover-color:#fff;--bs-btn-hover-bg:#0b5ed7;--bs-btn-hover-border-color:#0a58ca;--bs-btn-focus-shadow-rgb:49,132,253;--bs-btn-active-color:#fff;--bs-btn-active-bg:#0a58ca;--bs-btn-active-border-color:#0a53be;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#fff;--bs-btn-disabled-bg:#0d6efd;--bs-btn-disabled-border-color:#0d6efd}
+.btn-secondary{--bs-btn-color:#fff;--bs-btn-bg:#6c757d;--bs-btn-border-color:#6c757d;--bs-btn-hover-color:#fff;--bs-btn-hover-bg:#5c636a;--bs-btn-hover-border-color:#565e64;--bs-btn-focus-shadow-rgb:130,138,145;--bs-btn-active-color:#fff;--bs-btn-active-bg:#565e64;--bs-btn-active-border-color:#51585e;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#fff;--bs-btn-disabled-bg:#6c757d;--bs-btn-disabled-border-color:#6c757d}
+.btn-success{--bs-btn-color:#fff;--bs-btn-bg:#198754;--bs-btn-border-color:#198754;--bs-btn-hover-color:#fff;--bs-btn-hover-bg:#157347;--bs-btn-hover-border-color:#146c43;--bs-btn-focus-shadow-rgb:60,153,110;--bs-btn-active-color:#fff;--bs-btn-active-bg:#146c43;--bs-btn-active-border-color:#13653f;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#fff;--bs-btn-disabled-bg:#198754;--bs-btn-disabled-border-color:#198754}
+.btn-info{--bs-btn-color:#000;--bs-btn-bg:#0dcaf0;--bs-btn-border-color:#0dcaf0;--bs-btn-hover-color:#000;--bs-btn-hover-bg:#31d2f2;--bs-btn-hover-border-color:#25cff2;--bs-btn-focus-shadow-rgb:11,172,204;--bs-btn-active-color:#000;--bs-btn-active-bg:#3dd5f3;--bs-btn-active-border-color:#25cff2;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#000;--bs-btn-disabled-bg:#0dcaf0;--bs-btn-disabled-border-color:#0dcaf0}
+.btn-warning{--bs-btn-color:#000;--bs-btn-bg:#ffc107;--bs-btn-border-color:#ffc107;--bs-btn-hover-color:#000;--bs-btn-hover-bg:#ffca2c;--bs-btn-hover-border-color:#ffc720;--bs-btn-focus-shadow-rgb:217,164,6;--bs-btn-active-color:#000;--bs-btn-active-bg:#ffcd39;--bs-btn-active-border-color:#ffc720;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#000;--bs-btn-disabled-bg:#ffc107;--bs-btn-disabled-border-color:#ffc107}
+.btn-danger{--bs-btn-color:#fff;--bs-btn-bg:#dc3545;--bs-btn-border-color:#dc3545;--bs-btn-hover-color:#fff;--bs-btn-hover-bg:#bb2d3b;--bs-btn-hover-border-color:#b02a37;--bs-btn-focus-shadow-rgb:225,83,97;--bs-btn-active-color:#fff;--bs-btn-active-bg:#b02a37;--bs-btn-active-border-color:#a52834;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#fff;--bs-btn-disabled-bg:#dc3545;--bs-btn-disabled-border-color:#dc3545}
+.btn-dark{--bs-btn-color:#fff;--bs-btn-bg:#212529;--bs-btn-border-color:#212529;--bs-btn-hover-color:#fff;--bs-btn-hover-bg:#424649;--bs-btn-hover-border-color:#373b3e;--bs-btn-focus-shadow-rgb:66,70,73;--bs-btn-active-color:#fff;--bs-btn-active-bg:#4d5154;--bs-btn-active-border-color:#373b3e;--bs-btn-active-shadow:inset 0 3px 5px rgba(0,0,0,.125);--bs-btn-disabled-color:#fff;--bs-btn-disabled-bg:#212529;--bs-btn-disabled-border-color:#212529}
+.card{--bs-card-spacer-y:1rem;--bs-card-spacer-x:1rem;--bs-card-title-spacer-y:0.5rem;--bs-card-title-color:#212529;--bs-card-subtitle-color:#6c757d;--bs-card-border-width:1px;--bs-card-border-color:rgba(0,0,0,.125);--bs-card-border-radius:0.375rem;--bs-card-box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075);--bs-card-inner-border-radius:calc(0.375rem - 1px);--bs-card-cap-padding-y:0.5rem;--bs-card-cap-padding-x:1rem;--bs-card-cap-bg:rgba(0,0,0,.03);--bs-card-cap-color:inherit;--bs-card-height:auto;--bs-card-color:inherit;--bs-card-bg:#fff;--bs-card-img-overlay-padding:1rem;--bs-card-group-margin:0.75rem;position:relative;display:flex;flex-direction:column;min-width:0;height:var(--bs-card-height);color:var(--bs-card-color);word-wrap:break-word;background-color:var(--bs-card-bg);background-clip:border-box;border:var(--bs-card-border-width) solid var(--bs-card-border-color);border-radius:var(--bs-card-border-radius);box-shadow:var(--bs-card-box-shadow)}
+.card-body{flex:1 1 auto;padding:var(--bs-card-spacer-y) var(--bs-card-spacer-x);color:var(--bs-card-color)}
+.card-header{padding:var(--bs-card-cap-padding-y) var(--bs-card-cap-padding-x);margin-bottom:0;color:var(--bs-card-cap-color);background-color:var(--bs-card-cap-bg);border-bottom:var(--bs-card-border-width) solid var(--bs-card-border-color)}
+.navbar{--bs-navbar-padding-x:0;--bs-navbar-padding-y:0.5rem;--bs-navbar-color:rgba(255,255,255,.55);--bs-navbar-hover-color:rgba(255,255,255,.75);--bs-navbar-disabled-color:rgba(255,255,255,.25);--bs-navbar-active-color:#fff;--bs-navbar-brand-padding-y:0.3125rem;--bs-navbar-brand-margin-end:1rem;--bs-navbar-brand-font-size:1.25rem;--bs-navbar-brand-color:#fff;--bs-navbar-brand-hover-color:#fff;--bs-navbar-nav-link-padding-x:0.5rem;--bs-navbar-toggler-padding-y:0.25rem;--bs-navbar-toggler-padding-x:0.75rem;--bs-navbar-toggler-font-size:1.25rem;--bs-navbar-toggler-icon-bg:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2833, 37, 41, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");--bs-navbar-toggler-border-color:rgba(0,0,0,.1);--bs-navbar-toggler-border-radius:0.375rem;--bs-navbar-toggler-focus-width:0.25rem;--bs-navbar-toggler-transition:box-shadow .15s ease-in-out;position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:var(--bs-navbar-padding-y) var(--bs-navbar-padding-x)}
+.navbar-brand{padding-top:var(--bs-navbar-brand-padding-y);padding-bottom:var(--bs-navbar-brand-padding-y);margin-right:var(--bs-navbar-brand-margin-end);font-size:var(--bs-navbar-brand-font-size);color:var(--bs-navbar-brand-color);text-decoration:none;white-space:nowrap}
+.navbar-nav{--bs-nav-link-padding-x:0;--bs-nav-link-padding-y:0.5rem;--bs-nav-link-font-weight:;--bs-nav-link-color:var(--bs-navbar-color);--bs-nav-link-hover-color:var(--bs-navbar-hover-color);--bs-nav-link-disabled-color:var(--bs-navbar-disabled-color);display:flex;flex-direction:column;padding-left:0;margin-bottom:0;list-style:none}
+.navbar-dark{--bs-navbar-color:rgba(255,255,255,.55);--bs-navbar-hover-color:rgba(255,255,255,.75);--bs-navbar-disabled-color:rgba(255,255,255,.25);--bs-navbar-active-color:#fff;--bs-navbar-brand-color:#fff;--bs-navbar-brand-hover-color:#fff;--bs-navbar-toggler-border-color:rgba(255,255,255,.1);--bs-navbar-toggler-icon-bg:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.55%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e")}
+.bg-dark{--bs-bg-opacity:1;background-color:rgba(33,37,41,var(--bs-bg-opacity))!important}
+.badge{--bs-badge-padding-x:0.65em;--bs-badge-padding-y:0.35em;--bs-badge-font-size:0.75em;--bs-badge-font-weight:700;--bs-badge-color:#fff;--bs-badge-border-radius:0.375rem;display:inline-block;padding:var(--bs-badge-padding-y) var(--bs-badge-padding-x);font-size:var(--bs-badge-font-size);font-weight:var(--bs-badge-font-weight);line-height:1;color:var(--bs-badge-color);text-align:center;white-space:nowrap;vertical-align:baseline;border-radius:var(--bs-badge-border-radius)}
+.bg-success{--bs-bg-opacity:1;background-color:rgba(25,135,84,var(--bs-bg-opacity))!important}
+.bg-danger{--bs-bg-opacity:1;background-color:rgba(220,53,69,var(--bs-bg-opacity))!important}
+.bg-warning{--bs-bg-opacity:1;background-color:rgba(255,193,7,var(--bs-bg-opacity))!important}
+.bg-info{--bs-bg-opacity:1;background-color:rgba(13,202,240,var(--bs-bg-opacity))!important}
+.bg-primary{--bs-bg-opacity:1;background-color:rgba(13,110,253,var(--bs-bg-opacity))!important}
+.text-dark{--bs-text-opacity:1;color:rgba(33,37,41,var(--bs-text-opacity))!important}
+.text-muted{--bs-text-opacity:1;color:#6c757d!important}
+.text-center{text-align:center!important}
+.text-end{text-align:right!important}
+.d-flex{display:flex!important}
+.d-none{display:none!important}
+.d-block{display:block!important}
+.d-inline-block{display:inline-block!important}
+.justify-content-between{justify-content:space-between!important}
+.align-items-center{align-items:center!important}
+.align-items-start{align-items:flex-start!important}
+.align-items-end{align-items:flex-end!important}
+.align-middle{vertical-align:middle!important}
+.flex-wrap{flex-wrap:wrap!important}
+.mb-0{margin-bottom:0!important}
+.mb-1{margin-bottom:0.25rem!important}
+.mb-2{margin-bottom:0.5rem!important}
+.mb-3{margin-bottom:1rem!important}
+.mb-4{margin-bottom:1.5rem!important}
+.mt-1{margin-top:0.25rem!important}
+.mt-2{margin-top:0.5rem!important}
+.mt-3{margin-top:1rem!important}
+.mt-4{margin-top:1.5rem!important}
+.ms-auto{margin-left:auto!important}
+.ms-3{margin-left:1rem!important}
+.me-2{margin-right:0.5rem!important}
+.me-3{margin-right:1rem!important}
+.p-2{padding:0.5rem!important}
+.p-3{padding:1rem!important}
+.pt-2{padding-top:0.5rem!important}
+.pb-2{padding-bottom:0.5rem!important}
+.px-3{padding-left:1rem!important;padding-right:1rem!important}
+.py-2{padding-top:0.5rem!important;padding-bottom:0.5rem!important}
+.w-100{width:100%!important}
+.h1,.h2,.h3,.h4,.h5,.h6,h1,h2,h3,h4,h5,h6{margin-top:0;margin-bottom:0.5rem;font-weight:500;line-height:1.2}
+.h1,h1{font-size:calc(1.375rem + 1.5vw)}
+.h2,h2{font-size:calc(1.325rem + 0.9vw)}
+.h3,h3{font-size:calc(1.3rem + 0.6vw)}
+.h4,h4{font-size:calc(1.275rem + 0.3vw)}
+.h5,h5{font-size:1.25rem}
+.h6,h6{font-size:1rem}
+.form-label{margin-bottom:0.5rem}
+.form-control,.form-select{display:block;width:100%;padding:0.375rem 0.75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;background-image:none;border:1px solid #ced4da;-webkit-appearance:none;-moz-appearance:none;appearance:none;border-radius:0.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+.form-control:focus,.form-select:focus{color:#212529;background-color:#fff;border-color:#86b7fe;outline:0;box-shadow:0 0 0 0.25rem rgba(13,110,253,.25)}
+.shadow-sm{box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075)!important}
+.modal{--bs-modal-zindex:1055;--bs-modal-width:500px;--bs-modal-padding:1rem;--bs-modal-margin:0.5rem;--bs-modal-color:;--bs-modal-bg:#fff;--bs-modal-border-color:rgba(0,0,0,.2);--bs-modal-border-width:1px;--bs-modal-border-radius:0.5rem;--bs-modal-box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075);--bs-modal-inner-border-radius:calc(0.5rem - 1px);--bs-modal-header-padding-x:1rem;--bs-modal-header-padding-y:1rem;--bs-modal-header-padding:1rem 1rem;--bs-modal-header-border-color:rgba(0,0,0,.2);--bs-modal-header-border-width:1px;--bs-modal-title-line-height:1.5;--bs-modal-footer-gap:0.5rem;--bs-modal-footer-border-color:rgba(0,0,0,.2);--bs-modal-footer-border-width:1px;position:fixed;top:0;left:0;z-index:var(--bs-modal-zindex);display:none;width:100%;height:100%;overflow-x:hidden;overflow-y:auto;outline:0}
+.g-3{--bs-gutter-x:1rem;--bs-gutter-y:1rem}
+@media (max-width:700px){@media (max-width:700px){#eventTable{display:none}}@media (min-width:701px){#mobileEvents{display:none}}}
+)";
+
+// Minimal Bootstrap Icons (just the essential ones)
+const char MINIMAL_BOOTSTRAP_ICONS[] PROGMEM = R"(
+.bi{display:inline-block;width:1em;height:1em;fill:currentColor;vertical-align:-.125em}
+.bi-trophy-fill::before{content:"\f1b3"}
+.bi-star-fill::before{content:"\f586"}
+.bi-exclamation-triangle-fill::before{content:"\f33a"}
+.bi-stopwatch-fill::before{content:"\f59d"}
+.bi::before{font-family:"Bootstrap Icons";font-size:1em;font-style:normal;font-weight:normal!important;font-variant:normal;text-transform:none;line-height:1;vertical-align:-.125em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+)";
+
+// Simple Chart.js replacement for basic charts
+const char SIMPLE_CHARTS_JS[] PROGMEM = R"(
+class SimpleChart{constructor(t,e){this.canvas=t,this.ctx=t.getContext("2d"),this.config=e,this.data=e.data,this.options=e.options||{},this.render()}render(){const t=this.canvas,e=this.ctx,n=this.data;e.clearRect(0,0,t.width,t.height);const i=t.width-80,a=t.height-80;if("bar"===this.config.type)this.renderBarChart(e,n,40,40,i,a);else if("line"===this.config.type)this.renderLineChart(e,n,40,40,i,a)}renderBarChart(t,e,n,i,a,o){const r=e.labels,l=e.datasets[0].data,s=Math.max(...l),h=a/r.length,c=o/s;t.fillStyle="#f0f0f0",t.fillRect(n,i,a,o),t.strokeStyle="#ddd",t.lineWidth=1;for(let e=0;e<=10;e++){const r=i+o-e*o/10;t.beginPath(),t.moveTo(n,r),t.lineTo(n+a,r),t.stroke()}r.forEach(((e,r)=>{const s=l[r]*c,u=n+r*h+h/4,f=i+o-s,d=h/2;t.fillStyle="rgba(66,165,245,0.7)",t.fillRect(u,f,d,s),t.fillStyle="#333",t.font="12px Arial",t.textAlign="center",t.fillText(e,u+d/2,i+o+15),t.textAlign="right",t.fillText(l[r].toFixed(1),n-5,f+s/2+3)}))}renderLineChart(t,e,n,i,a,o){const r=e.labels,l=e.datasets[0].data,s=Math.max(...l),h=a/(r.length-1),c=o/s;t.fillStyle="#f0f0f0",t.fillRect(n,i,a,o),t.strokeStyle="#ddd",t.lineWidth=1;for(let e=0;e<=10;e++){const r=i+o-e*o/10;t.beginPath(),t.moveTo(n,r),t.lineTo(n+a,r),t.stroke()}t.strokeStyle="rgba(66,165,245,1)",t.lineWidth=2,t.beginPath();for(let e=0;e<r.length;e++){const t=n+e*h,a=i+o-l[e]*c;0===e?this.ctx.moveTo(t,a):this.ctx.lineTo(t,a)}t.stroke(),t.fillStyle="rgba(66,165,245,1)",r.forEach(((e,r)=>{const s=n+r*h,u=i+o-l[r]*c;t.beginPath(),t.arc(s,u,3,0,2*Math.PI),t.fill(),t.fillStyle="#333",t.font="12px Arial",t.textAlign="center",t.fillText(e,s,i+o+15)}))}}
+function Chart(t,e){return new SimpleChart(t,e)}
+)";
+
+// Minimal Bootstrap JS functionality
+const char MINIMAL_BOOTSTRAP_JS[] PROGMEM = R"(
+(function(){
+class Modal{constructor(t){this.element=t,this.backdrop=null}show(){this.element.style.display="block",this.element.classList.add("show"),this.createBackdrop()}hide(){this.element.style.display="none",this.element.classList.remove("show"),this.removeBackdrop()}createBackdrop(){this.backdrop=document.createElement("div"),this.backdrop.className="modal-backdrop fade show",this.backdrop.style.cssText="position:fixed;top:0;left:0;z-index:1050;width:100vw;height:100vh;background-color:#000;opacity:0.5",document.body.appendChild(this.backdrop),this.backdrop.addEventListener("click",(()=>this.hide()))}removeBackdrop(){this.backdrop&&(document.body.removeChild(this.backdrop),this.backdrop=null)}}
+window.bootstrap={Modal:Modal};
+document.addEventListener("click",(function(t){t.target.matches('[data-bs-dismiss="modal"]')&&t.target.closest(".modal")&&new Modal(t.target.closest(".modal")).hide()}));
+})();
+)";
+
+// Forward declarations for asset serving functions
+void handleBootstrapCSS();
+void handleBootstrapJS();
+void handleChartsJS();
+void handleBootstrapIcons();
+
 bool g_isSystemSerialDown = false;
 char g_serialSystemTriggerAssetName[32] = "";
 time_t g_systemLastStateChangeTime = 0;
@@ -258,6 +382,31 @@ bool g_systemStateInitialized = false;
 int g_currentShiftIndex = -1;
 time_t g_currentShiftStartTimeEpoch = 0;
 bool g_shiftFeatureInitialized = false;
+
+// --- Local Asset Serving Functions (NEW) ---
+void handleBootstrapCSS() {
+  server.sendHeader("Content-Type", "text/css");
+  server.sendHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+  server.send_P(200, "text/css", MINIMAL_BOOTSTRAP_CSS);
+}
+
+void handleBootstrapJS() {
+  server.sendHeader("Content-Type", "application/javascript");
+  server.sendHeader("Cache-Control", "public, max-age=86400");
+  server.send_P(200, "application/javascript", MINIMAL_BOOTSTRAP_JS);
+}
+
+void handleChartsJS() {
+  server.sendHeader("Content-Type", "application/javascript");
+  server.sendHeader("Cache-Control", "public, max-age=86400");
+  server.send_P(200, "application/javascript", SIMPLE_CHARTS_JS);
+}
+
+void handleBootstrapIcons() {
+  server.sendHeader("Content-Type", "text/css");
+  server.sendHeader("Cache-Control", "public, max-age=86400");
+  server.send_P(200, "text/css", MINIMAL_BOOTSTRAP_ICONS);
+}
 
 // --- Enhanced WiFi Functions (NEW/ENHANCED) ---
 
@@ -1067,6 +1216,13 @@ void setup() {
   server.on("/download_shiftlog", HTTP_GET, handleDownloadShiftLog);
   server.on("/analytics", HTTP_GET, []() { server.send(200, "text/html", htmlAnalytics()); });
   server.on("/analytics-compare", HTTP_GET, []() { server.send(200, "text/html", htmlAnalyticsCompare()); });
+  
+  // --- LOCAL ASSET ROUTES (NEW) - Serve CSS/JS locally for offline functionality ---
+  server.on("/assets/bootstrap.min.css", HTTP_GET, handleBootstrapCSS);
+  server.on("/assets/bootstrap.bundle.min.js", HTTP_GET, handleBootstrapJS);
+  server.on("/assets/chart.min.js", HTTP_GET, handleChartsJS);
+  server.on("/assets/bootstrap-icons.min.css", HTTP_GET, handleBootstrapIcons);
+  
   server.on("/reconfigure_wifi", HTTP_POST, handleWiFiReconfigurePost);
   server.on("/save_config", HTTP_POST, handleConfigPost);
   server.on("/clear_log", HTTP_POST, handleClearLog);
@@ -1425,7 +1581,7 @@ String htmlAssetDetail(uint8_t idx) {
 
   String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Detail: " + assetNameStr + "</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
   html += "<style>body{background-color:#f8f9fa;}</style>";
   html += "</head><body>";
 
@@ -1449,7 +1605,7 @@ String htmlAssetDetail(uint8_t idx) {
   html += "  </div>";
   html += "</div>";
 
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -1460,8 +1616,7 @@ String htmlAssetDetail(uint8_t idx) {
 
 String htmlConfig() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
+  html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
   html += "<style>";
   html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}";
   html += "header{background:#1976d2;color:#fff;padding:1.2rem 0;text-align:center;box-shadow:0 2px 10px #0001; font-size:1.6em; font-weight:700;}";
@@ -1604,7 +1759,7 @@ String htmlConfig() {
     });
   )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -1612,9 +1767,8 @@ String htmlConfig() {
 String htmlDashboard() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Dashboard</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
+  html += "<script src='/assets/chart.min.js'></script>";
   html += "<style>body{background-color:#f8f9fa;}</style>";
   html += "</head><body>";
 
@@ -1784,7 +1938,7 @@ else { updateDashboard(); }
 setInterval(updateDashboard, 5000);
 )rawliteral";   // <--- THIS IS THE CORRECTED LINE
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -1794,10 +1948,8 @@ String htmlAnalytics() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Analytics: ";
   html += assetName + "</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js'></script>";
+  html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
+  html += "<script src='/assets/chart.min.js'></script>";
   html += "<style>body{background-color:#f8f9fa;} #ganttChartContainer {min-height: 250px; margin-bottom:20px;} .card-header h4 { margin-bottom:0; }</style>";
   html += "</head><body>";
 
@@ -2224,7 +2376,7 @@ function fetchAnalyticsData() {
 document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -2236,10 +2388,9 @@ document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 String htmlAnalyticsCompare() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Compare Assets</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
-  html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
+  html += "<link rel='stylesheet' href='/assets/bootstrap-icons.min.css'>";
+  html += "<script src='/assets/chart.min.js'></script>";
   html += "<style>";
   html += "body{background-color:#f8f9fa;font-family:Roboto,Arial,sans-serif;}";
   html += ".leaderboard-badge{font-size:1.4em;margin-right:0.5em;}";
@@ -2437,7 +2588,7 @@ function renderCompareTablePage() {
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fetchCompareDataPage) : fetchCompareDataPage();
 )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.bundle.min.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -2452,8 +2603,7 @@ void sendHtmlEventsPage() {
   // --- Start of HTML Document ---
   server.sendContent("<!DOCTYPE html><html lang='en'><head><title>Event Log</title>");
   server.sendContent("<meta name='viewport' content='width=device-width,initial-scale=1'>");
-  server.sendContent("<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>");
-  server.sendContent("<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>");
+  server.sendContent("<link href='/assets/bootstrap.min.css' rel='stylesheet'>");
 
   // --- ENHANCED CSS ---
   server.sendContent("<style>");
@@ -2562,7 +2712,7 @@ server.sendContent(filterRowHtml);
   server.sendContent(modalHtml);
 
   // --- Bootstrap JS and icons
-  server.sendContent("<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>");
+  server.sendContent("<script src='/assets/bootstrap.bundle.min.js'></script>");
   server.sendContent(R"rawliteral(<svg xmlns="http://www.w3.org/2000/svg" style="display: none;"><symbol id="icon-edit" viewBox="0 0 16 16"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></symbol></svg>)rawliteral");
 
   // --- Main JS: all logic for page, filters, events, modal, rendering ---
@@ -3333,6 +3483,8 @@ void handleNotFound() {
     server.send(404, "text/plain", "Not found"); 
   }
 }
+
+// End of file
 
 
 
