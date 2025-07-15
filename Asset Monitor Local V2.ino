@@ -1087,12 +1087,7 @@ void setup() {
   // Show final status on OLED
   updateOledDisplay();
   
-  Serial.println("Web server started. Device is ready.");
-  Serial.printf("Device is accessible via %s mode at IP: %s\n", 
-                currentWiFiState == WIFI_STA_CONNECTED ? "STA" : "AP",
-                currentWiFiState == WIFI_STA_CONNECTED ? WiFi.localIP().toString().c_str() : WiFi.softAPIP().toString().c_str());
-}
-
+  displayBootMessage("Initializing Assets...");
   Serial.printf("Initializing %u assets...\n", config.assetCount);
   time_t initialTime = time(nullptr);
   for (uint8_t i = 0; i < config.assetCount; ++i) {
@@ -1148,43 +1143,15 @@ void setup() {
     }
   }
 
-  server.on("/", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
-  server.on("/dashboard", HTTP_GET, []() { server.send(200, "text/html", htmlDashboard()); });
-  server.on("/config", HTTP_GET, []() { server.send(200, "text/html", htmlConfig()); });
-  server.on("/events", HTTP_GET, sendHtmlEventsPage);
-  server.on("/asset", HTTP_GET, []() {
-    if (server.hasArg("idx")) {
-      uint8_t idx = server.arg("idx").toInt();
-      if (idx < config.assetCount && idx < MAX_ASSETS) { server.send(200, "text/html", htmlAssetDetail(idx)); return; }
-    }
-    server.send(404, "text/plain", "Asset not found");
-  });
-  server.on("/shiftlogs_page", HTTP_GET, handleShiftLogsPage);
-  server.on("/download_shiftlog", HTTP_GET, handleDownloadShiftLog);
-  server.on("/analytics", HTTP_GET, []() { server.send(200, "text/html", htmlAnalytics()); });
-  server.on("/analytics-compare", HTTP_GET, []() { server.send(200, "text/html", htmlAnalyticsCompare()); });
-  server.on("/reconfigure_wifi", HTTP_POST, handleWiFiReconfigurePost);
-  server.on("/save_config", HTTP_POST, handleConfigPost);
-  server.on("/clear_log", HTTP_POST, handleClearLog);
-  server.on("/export_log", HTTP_GET, handleExportLog);
-  server.on("/api/summary", HTTP_GET, handleApiSummary);
-  server.on("/api/events", HTTP_GET, handleApiEvents);
-  server.on("/api/config", HTTP_GET, handleApiConfig);
-  server.on("/api/note", HTTP_POST, handleApiNote);
-  server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
-  
- // =================================================================
-  server.onNotFound(handleNotFound);
-  server.begin();
   Serial.println("Web server started. Device is ready.");
+  Serial.printf("Device is accessible via %s mode at IP: %s\n", 
+                currentWiFiState == WIFI_STA_CONNECTED ? "STA" : "AP",
+                currentWiFiState == WIFI_STA_CONNECTED ? WiFi.localIP().toString().c_str() : WiFi.softAPIP().toString().c_str());
 }
 
 // =========================================================================
 // --- Block 1:  loop() function 
 // =========================================================================
-
-// --- OLED update timing variable (ADDITION) ---
-unsigned long lastOledUpdate = 0;
 
 void loop() {
   server.handleClient();
