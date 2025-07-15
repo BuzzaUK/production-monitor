@@ -1616,7 +1616,6 @@ String htmlAssetDetail(uint8_t idx) {
 
 String htmlConfig() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Setup</title><meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
   html += "<style>";
   html += "body{font-family:Roboto,sans-serif;background:#f3f7fa;margin:0;}";
@@ -1768,7 +1767,6 @@ String htmlConfig() {
 String htmlDashboard() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Dashboard</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
   html += "<script src='/assets/chart.min.js'></script>";
   html += "<style>body{background-color:#f8f9fa;}</style>";
@@ -1950,7 +1948,6 @@ String htmlAnalytics() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Asset Analytics: ";
   html += assetName + "</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
   html += "<script src='/assets/chart.min.js'></script>";
   html += "<style>body{background-color:#f8f9fa;} #ganttChartContainer {min-height: 250px; margin-bottom:20px;} .card-header h4 { margin-bottom:0; }</style>";
@@ -2391,7 +2388,6 @@ document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 String htmlAnalyticsCompare() {
   String html = "<!DOCTYPE html><html lang='en'><head><title>Compare Assets</title>";
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='/assets/bootstrap.min.css' rel='stylesheet'>";
   html += "<link rel='stylesheet' href='/assets/bootstrap-icons.min.css'>";
   html += "<script src='/assets/chart.min.js'></script>";
@@ -2607,7 +2603,6 @@ void sendHtmlEventsPage() {
   // --- Start of HTML Document ---
   server.sendContent("<!DOCTYPE html><html lang='en'><head><title>Event Log</title>");
   server.sendContent("<meta name='viewport' content='width=device-width,initial-scale=1'>");
-  server.sendContent("<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>");
   server.sendContent("<link href='/assets/bootstrap.min.css' rel='stylesheet'>");
 
   // --- ENHANCED CSS ---
@@ -3488,6 +3483,8 @@ void handleNotFound() {
     server.send(404, "text/plain", "Not found"); 
   }
 }
+
+// End of file
 
 
 
