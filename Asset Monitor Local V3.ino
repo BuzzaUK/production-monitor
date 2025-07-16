@@ -939,6 +939,17 @@ void setup() {
   server.on("/api/note", HTTP_POST, handleApiNote);
   server.on("/delete_logs", HTTP_POST, handleDeleteLogs);
   
+  // --- JavaScript Asset Routes (ADDITION) ---
+  server.on("/assets/chart.js", HTTP_GET, []() {
+    server.sendHeader("Content-Type", "application/javascript");
+    server.send_P(200, "application/javascript", SIMPLE_CHARTS_JS);
+  });
+  server.on("/assets/bootstrap.js", HTTP_GET, []() {
+    server.sendHeader("Content-Type", "application/javascript");
+    server.send_P(200, "application/javascript", MINIMAL_BOOTSTRAP_JS);
+  });
+  // --- END ASSET ROUTES ---
+  
  // =================================================================
   server.onNotFound(handleNotFound);
   server.begin();
@@ -1241,7 +1252,7 @@ String htmlAssetDetail(uint8_t idx) {
   html += "  </div>";
   html += "</div>";
 
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -1397,7 +1408,7 @@ String htmlConfig() {
     });
   )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/bootstrap.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -1407,7 +1418,7 @@ String htmlDashboard() {
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  html += "<script src='/assets/chart.js'></script>";
   html += "<style>body{background-color:#f8f9fa;}</style>";
   html += "</head><body>";
 
@@ -1577,7 +1588,8 @@ else { updateDashboard(); }
 setInterval(updateDashboard, 5000);
 )rawliteral";   // <--- THIS IS THE CORRECTED LINE
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/chart.js'></script>";
+  html += "<script src='/assets/bootstrap.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -1589,7 +1601,7 @@ String htmlAnalytics() {
   html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  html += "<script src='/assets/chart.js'></script>";
   html += "<script src='https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js'></script>";
   html += "<style>body{background-color:#f8f9fa;} #ganttChartContainer {min-height: 250px; margin-bottom:20px;} .card-header h4 { margin-bottom:0; }</style>";
   html += "</head><body>";
@@ -2017,7 +2029,8 @@ function fetchAnalyticsData() {
 document.addEventListener('DOMContentLoaded', fetchAnalyticsData);
 )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/chart.js'></script>";
+  html += "<script src='/assets/bootstrap.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -2032,7 +2045,7 @@ String htmlAnalyticsCompare() {
   html += "<link href='https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' rel='stylesheet'>";
   html += "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>";
   html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  html += "<script src='/assets/chart.js'></script>";
   html += "<style>";
   html += "body{background-color:#f8f9fa;font-family:Roboto,Arial,sans-serif;}";
   html += ".leaderboard-badge{font-size:1.4em;margin-right:0.5em;}";
@@ -2230,7 +2243,8 @@ function renderCompareTablePage() {
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fetchCompareDataPage) : fetchCompareDataPage();
 )rawliteral";
   html += "</script>";
-  html += "<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>";
+  html += "<script src='/assets/chart.js'></script>";
+  html += "<script src='/assets/bootstrap.js'></script>";
   html += "</body></html>";
   return html;
 }
@@ -2355,7 +2369,7 @@ server.sendContent(filterRowHtml);
   server.sendContent(modalHtml);
 
   // --- Bootstrap JS and icons
-  server.sendContent("<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>");
+  server.sendContent("<script src='/assets/bootstrap.js'></script>");
   server.sendContent(R"rawliteral(<svg xmlns="http://www.w3.org/2000/svg" style="display: none;"><symbol id="icon-edit" viewBox="0 0 16 16"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></symbol></svg>)rawliteral");
 
   // --- Main JS: all logic for page, filters, events, modal, rendering ---
