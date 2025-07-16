@@ -352,8 +352,135 @@ const char MINIMAL_BOOTSTRAP_ICONS[] PROGMEM = R"(
 
 // Simple Chart.js replacement for basic charts
 const char SIMPLE_CHARTS_JS[] PROGMEM = R"(
-class SimpleChart{constructor(t,e){this.canvas=t,this.ctx=t.getContext("2d"),this.config=e,this.data=e.data,this.options=e.options||{},this.render()}render(){const t=this.canvas,e=this.ctx,n=this.data;e.clearRect(0,0,t.width,t.height);const i=t.width-80,a=t.height-80;if("bar"===this.config.type)this.renderBarChart(e,n,40,40,i,a);else if("line"===this.config.type)this.renderLineChart(e,n,40,40,i,a)}renderBarChart(t,e,n,i,a,o){const r=e.labels,l=e.datasets[0].data,s=Math.max(...l),h=a/r.length,c=o/s;t.fillStyle="#f0f0f0",t.fillRect(n,i,a,o),t.strokeStyle="#ddd",t.lineWidth=1;for(let e=0;e<=10;e++){const r=i+o-e*o/10;t.beginPath(),t.moveTo(n,r),t.lineTo(n+a,r),t.stroke()}r.forEach(((e,r)=>{const s=l[r]*c,u=n+r*h+h/4,f=i+o-s,d=h/2;t.fillStyle="rgba(66,165,245,0.7)",t.fillRect(u,f,d,s),t.fillStyle="#333",t.font="12px Arial",t.textAlign="center",t.fillText(e,u+d/2,i+o+15),t.textAlign="right",t.fillText(l[r].toFixed(1),n-5,f+s/2+3)}))}renderLineChart(t,e,n,i,a,o){const r=e.labels,l=e.datasets[0].data,s=Math.max(...l),h=a/(r.length-1),c=o/s;t.fillStyle="#f0f0f0",t.fillRect(n,i,a,o),t.strokeStyle="#ddd",t.lineWidth=1;for(let e=0;e<=10;e++){const r=i+o-e*o/10;t.beginPath(),t.moveTo(n,r),t.lineTo(n+a,r),t.stroke()}t.strokeStyle="rgba(66,165,245,1)",t.lineWidth=2,t.beginPath();for(let e=0;e<r.length;e++){const t=n+e*h,a=i+o-l[e]*c;0===e?this.ctx.moveTo(t,a):this.ctx.lineTo(t,a)}t.stroke(),t.fillStyle="rgba(66,165,245,1)",r.forEach(((e,r)=>{const s=n+r*h,u=i+o-l[r]*c;t.beginPath(),t.arc(s,u,3,0,2*Math.PI),t.fill(),t.fillStyle="#333",t.font="12px Arial",t.textAlign="center",t.fillText(e,s,i+o+15)}))}}
-function Chart(t,e){return new SimpleChart(t,e)}
+class SimpleChart {
+  constructor(canvas, config) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.config = config;
+    this.data = config.data;
+    this.options = config.options || {};
+    this.render();
+  }
+
+  render() {
+    const canvas = this.canvas;
+    const ctx = this.ctx;
+    const data = this.data;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const chartWidth = canvas.width - 80;
+    const chartHeight = canvas.height - 80;
+    
+    if (this.config.type === 'bar') {
+      this.renderBarChart(ctx, data, 40, 40, chartWidth, chartHeight);
+    } else if (this.config.type === 'line') {
+      this.renderLineChart(ctx, data, 40, 40, chartWidth, chartHeight);
+    }
+  }
+
+  renderBarChart(ctx, data, x, y, width, height) {
+    const labels = data.labels;
+    const values = data.datasets[0].data;
+    const maxValue = Math.max(...values);
+    const barWidth = width / labels.length;
+    const scale = height / maxValue;
+
+    // Draw background
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(x, y, width, height);
+
+    // Draw grid lines
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const gridY = y + height - (i * height / 10);
+      ctx.beginPath();
+      ctx.moveTo(x, gridY);
+      ctx.lineTo(x + width, gridY);
+      ctx.stroke();
+    }
+
+    // Draw bars
+    labels.forEach((label, index) => {
+      const barHeight = values[index] * scale;
+      const barX = x + (index * barWidth) + (barWidth / 4);
+      const barY = y + height - barHeight;
+      const actualBarWidth = barWidth / 2;
+
+      ctx.fillStyle = 'rgba(66,165,245,0.7)';
+      ctx.fillRect(barX, barY, actualBarWidth, barHeight);
+
+      // Draw labels
+      ctx.fillStyle = '#333';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, barX + (actualBarWidth / 2), y + height + 15);
+
+      ctx.textAlign = 'right';
+      ctx.fillText(values[index].toFixed(1), x - 5, barY + (barHeight / 2) + 3);
+    });
+  }
+
+  renderLineChart(ctx, data, x, y, width, height) {
+    const labels = data.labels;
+    const values = data.datasets[0].data;
+    const maxValue = Math.max(...values);
+    const stepX = width / (labels.length - 1);
+    const scale = height / maxValue;
+
+    // Draw background
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(x, y, width, height);
+
+    // Draw grid lines
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const gridY = y + height - (i * height / 10);
+      ctx.beginPath();
+      ctx.moveTo(x, gridY);
+      ctx.lineTo(x + width, gridY);
+      ctx.stroke();
+    }
+
+    // Draw line
+    ctx.strokeStyle = 'rgba(66,165,245,1)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < labels.length; i++) {
+      const pointX = x + (i * stepX);
+      const pointY = y + height - (values[i] * scale);
+      if (i === 0) {
+        ctx.moveTo(pointX, pointY);
+      } else {
+        ctx.lineTo(pointX, pointY);
+      }
+    }
+    ctx.stroke();
+
+    // Draw points and labels
+    ctx.fillStyle = 'rgba(66,165,245,1)';
+    labels.forEach((label, index) => {
+      const pointX = x + (index * stepX);
+      const pointY = y + height - (values[index] * scale);
+      
+      ctx.beginPath();
+      ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = '#333';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, pointX, y + height + 15);
+      ctx.fillStyle = 'rgba(66,165,245,1)';
+    });
+  }
+}
+
+function Chart(canvas, config) {
+  return new SimpleChart(canvas, config);
+}
 )";
 
 // Minimal Bootstrap JS functionality
